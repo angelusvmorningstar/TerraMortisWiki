@@ -37,7 +37,7 @@ development_status:
 
   epic-1: in-progress
   1-1-repo-scaffold-and-css-tokens: done
-  1-2-mongo-snapshot-script: backlog
+  1-2-mongo-snapshot-script: done
   1-3-discord-oauth-reuse: backlog
 
   epic-2: backlog

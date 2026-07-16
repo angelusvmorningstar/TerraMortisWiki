@@ -9,9 +9,12 @@
   },
   "scripts": {
     "start": "node server/index.js",
-    "test": "node --test server/**/*.test.js"
+    "snapshot": "node scripts/snapshot.mjs",
+    "test": "node --test"
   },
   "dependencies": {
-    "express": "^5.2.1"
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mongodb": "^7.5.0"
   }
 }
