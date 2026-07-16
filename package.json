@@ -1,0 +1,17 @@
+{
+  "name": "terra-mortis-wiki",
+  "version": "0.1.0",
+  "description": "Terra Mortis Wiki — read-only, player-facing companion site for the Terra Mortis Vampire: The Requiem 2e chronicle.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node --test server/**/*.test.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}

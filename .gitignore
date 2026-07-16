@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# AI-generated character portraits are NEVER committed (CLAUDE.md hard rule).
+# The live site always renders a CSS-only placeholder when a portrait is absent.
+assets/portraits/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db

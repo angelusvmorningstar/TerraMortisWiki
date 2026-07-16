@@ -1,0 +1,78 @@
+/* ══════════════════════════════════════════
+   THEME — Design tokens (colours, fonts)
+   Ported from ../TM Suite/public/css/theme.css (read-only source of truth).
+   Only the token subset this repo plausibly needs so far is ported — do not
+   invent or rename tokens; match the source values verbatim. Extend from the
+   source when a later story needs more.
+
+   Default: Parchment (warm light)
+   Override: [data-theme="dark"] — dark mode opt-in
+   ══════════════════════════════════════════ */
+
+/* ── Parchment (default) ── */
+:root {
+  /* Backgrounds & surfaces */
+  --bg:#F4EFE4;--surf:#EDE7D8;--surf1:#E9E2D1;--surf2:#E5DEC9;--surf3:#DBD3BC;
+  --surf-a6:rgba(244,239,228,.6);--surf2-a8:rgba(229,222,201,.8);
+  --overlay:rgba(0,0,0,.50);--overlay2:rgba(0,0,0,.65);
+
+  /* Borders (warm brown, varying opacity) */
+  --bdr:rgba(120,90,40,.20);--bdr2:rgba(120,90,40,.38);--bdr3:rgba(120,90,40,.55);
+
+  /* Gold accents — dark amber for legibility on light bg */
+  --gold:#8B6010;--gold2:#7A5208;--gdim:#A07A20;
+  --gold-a8:rgba(120,90,40,.08);--gold-a12:rgba(120,90,40,.12);
+  --gold-a15:rgba(120,90,40,.15);--gold-a20:rgba(120,90,40,.20);
+  --gold-a30:rgba(120,90,40,.30);
+
+  /* Crimson accents */
+  --crim:#7A0000;--crim2:#8B1010;
+  --crim-a15:rgba(122,0,0,.15);--crim-a25:rgba(122,0,0,.25);
+  --crim-a40:rgba(122,0,0,.40);--crim-a70:rgba(122,0,0,.70);
+  --crim-hover:#A00000;--crim-active:#6B0000;
+
+  /* Text */
+  --txt:#1C1410;--txt2:#4A3A28;--txt3:#6A5238;
+  /* Aliases — resolve via the theme-overrideable tokens above */
+  --txt1:var(--txt);--txt-dim:var(--txt3);
+
+  /* Text on coloured surfaces */
+  --txt-on-dark:#F4EFE4;--txt-inverse:var(--bg);
+  --txt-on-gold:#1a1208;
+
+  /* Semantic accent — crimson on parchment */
+  --accent:var(--crim);--accent2:var(--crim2);
+
+  /* Fonts — same for all themes */
+  --fh:'Cinzel',serif;--fl:'Lato',sans-serif;--ft:'Libre Baskerville',serif;
+  /* Display variant — used for reading-pane h1/h2 in rules/lore documents */
+  --fh-decorative:'Cinzel Decorative','Cinzel',serif;
+}
+
+/* ── Dark mode override ── */
+[data-theme="dark"] {
+  /* Backgrounds & surfaces */
+  --bg:#0D0B09;--surf:#161210;--surf2:#1E1A16;--surf3:#252018;
+  --surf-a6:rgba(22,18,16,.6);--surf2-a8:rgba(30,26,22,.8);
+  --overlay:rgba(0,0,0,.65);--overlay2:rgba(0,0,0,.78);
+
+  /* Borders */
+  --bdr:rgba(201,169,98,.18);--bdr2:rgba(201,169,98,.35);--bdr3:rgba(201,169,98,.55);
+
+  /* Gold accents */
+  --gold:#C9A962;--gold2:#E0C47A;--gdim:#A08848;
+  --gold-a8:rgba(201,169,98,.08);--gold-a12:rgba(201,169,98,.12);
+  --gold-a15:rgba(201,169,98,.15);--gold-a20:rgba(201,169,98,.2);
+  --gold-a30:rgba(201,169,98,.3);
+
+  /* Crimson accents */
+  --crim:#8B0000;--crim2:#A81010;
+  --crim-a15:rgba(139,0,0,.15);--crim-a25:rgba(139,0,0,.25);
+  --crim-a40:rgba(139,0,0,.4);--crim-a70:rgba(139,0,0,.7);
+
+  /* Text */
+  --txt:#E8E0D0;--txt2:#C4B49A;--txt3:#8A7A6A;
+
+  /* Semantic accent — gold on dark */
+  --accent:var(--gold2);--accent2:var(--gold);
+}

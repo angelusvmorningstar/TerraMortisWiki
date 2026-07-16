@@ -1,0 +1,63 @@
+/* ══════════════════════════════════════════
+   BASE — minimal page layout for the skeleton build (story 1-1).
+   Only the wrapper/hero this story needs. Component library (cards, grids,
+   chips) is ported in later stories as they are needed. All colour/font
+   values flow through theme.css tokens — no bare hex, no inline styles.
+   ══════════════════════════════════════════ */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html,
+body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--txt);
+  font-family: var(--ft);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+}
+
+.hero {
+  max-width: 42rem;
+  text-align: center;
+  background: var(--surf);
+  border: 1px solid var(--bdr2);
+  border-radius: 10px;
+  padding: 3rem 2.5rem;
+}
+
+.hero__eyebrow {
+  margin: 0 0 0.75rem;
+  font-family: var(--fh);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.hero__title {
+  margin: 0 0 1rem;
+  font-family: var(--fh-decorative);
+  font-size: clamp(2.2rem, 6vw, 3.4rem);
+  font-weight: 700;
+  color: var(--gold2);
+}
+
+.hero__lede {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--txt2);
+}
