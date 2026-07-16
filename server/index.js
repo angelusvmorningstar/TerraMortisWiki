@@ -3,8 +3,12 @@
 // home page. Auth, snapshot loading, and real routes arrive in later stories.
 
 import express from 'express';
+import cookieParser from 'cookie-parser';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import authRouter from './routes/auth.js';
+import { requireAuth } from './middleware/auth.js';
+import { loadSnapshot } from './snapshot-store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = join(__dirname, '..', 'public');
@@ -40,12 +44,50 @@ function homePage() {
 export function createApp() {
   const app = express();
 
-  // Serve ported CSS (and later, other static assets) from public/.
-  app.use(express.static(PUBLIC_DIR));
+  // Load the snapshot into memory once at boot (Story 1.3). No-op if a snapshot
+  // has already been loaded or test-injected via snapshot-store.setSnapshot().
+  loadSnapshot();
 
-  // Placeholder home page (AC #1).
+  // Parse JSON bodies (the OAuth callback POSTs { code, state }) and cookies
+  // (the OAuth state CSRF cookie set by GET /auth/discord).
+  app.use(express.json());
+  app.use(cookieParser());
+
+  // --- Unauthenticated login surface -------------------------------------
+  // The whole site sits behind Discord login (PRD; AC #4). But a login gate
+  // needs a public entry point — the shell that hosts the "Log in with Discord"
+  // button and the OAuth routes that start/finish the flow. These, plus the
+  // static CSS the shell needs to render, are the ONLY anonymous surface. None
+  // of them serve snapshot/player data, so there is no anonymous CONTENT tier —
+  // which is what AC #4 forbids. (See Story 1.3 dev notes for the full
+  // resolution of the tension with Story 1.1's public `/` smoke test.)
+
+  // Ported CSS ONLY — public so the logged-out login shell renders. Deliberately
+  // scoped to /css rather than the whole public/ tree: mounting express.static on
+  // PUBLIC_DIR itself would mean any future story that drops rendered content
+  // under public/ (character pages, world-tab data, etc.) is served with ZERO
+  // auth check by default — the exact cross-player leak this app exists to
+  // prevent. Anything content-bearing must be registered as a route AFTER the
+  // requireAuth gate below, never dropped into a statically-served directory.
+  app.use('/css', express.static(join(PUBLIC_DIR, 'css')));
+
+  // Placeholder home / login-landing page (Story 1.1, kept public).
   app.get('/', (_req, res) => {
     res.type('html').send(homePage());
+  });
+
+  // Discord OAuth routes (public — they ARE the login flow). AC #1/#2.
+  app.use('/auth', authRouter);
+
+  // --- Authentication gate -----------------------------------------------
+  // Everything registered BELOW this line requires a valid session (AC #4).
+  // Future content routers (stories 2-1/2-2/2-3) register after this call.
+  app.use(requireAuth);
+
+  // Current-session endpoint — the frontend calls this to learn who is logged
+  // in. First gated route; also the concrete route that proves the gate works.
+  app.get('/api/me', (req, res) => {
+    res.json({ user: req.user });
   });
 
   return app;

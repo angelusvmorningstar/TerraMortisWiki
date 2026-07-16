@@ -79,6 +79,43 @@ npm run snapshot        # == node scripts/snapshot.mjs
 After a successful run, review the diff, then commit and push `data/snapshot.json`
 so the deploy picks up the fresh data.
 
+## Discord OAuth setup (one-time, manual)
+
+The Wiki reuses TM Suite's **existing Discord application** for login — there is
+no second Discord app to create. You only need to register this repo's redirect
+URI as an additional entry on that same app:
+
+1. Open the [Discord Developer Portal](https://discord.com/developers/applications)
+   and select the **same application TM Suite uses**.
+2. Go to **OAuth2 → General → Redirects** and click **Add Another**.
+3. Add this app's callback URL as a new entry alongside TM Suite's existing one
+   (Discord supports multiple redirect URIs natively):
+   - Local: `http://localhost:3000/auth/discord/callback`
+   - Production: `https://<your-wiki-host>/auth/discord/callback`
+4. **Save Changes**.
+5. Copy the application's **Client ID** and **Client Secret** into this repo's
+   local `.env` (gitignored) as `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET`,
+   and set `DISCORD_REDIRECT_URI` to match the entry you registered. See
+   `.env.example`.
+
+This is a portal-side configuration step only — it is not a code change. The
+`identify` scope (the only scope this app requests) needs no special approval.
+
+The whole site is behind Discord login: every route except `GET /auth/discord`,
+`POST /auth/discord/callback`, the login landing page (`/`), and the static CSS
+requires a valid Discord session. A request with no/invalid token gets `401`; a
+valid Discord identity with no matching `players` record in the snapshot gets
+`403`. Player resolution reads the committed snapshot, never live Mongo — so a
+player added to TM Suite since the last `npm run snapshot` cannot log in until
+the next snapshot + deploy (a known, accepted trade-off of the rebuild-on-command
+model).
+
+### Local test bypass
+
+For local development only (never when `NODE_ENV=production`), sending
+`Authorization: Bearer local-test-token` satisfies `requireAuth` without a real
+Discord round-trip, mirroring TM Suite's `local-test-token` pattern.
+
 ## Project layout
 
 ```

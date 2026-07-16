@@ -35,10 +35,10 @@ story_location: specs/stories
 
 development_status:
 
-  epic-1: in-progress
+  epic-1: done
   1-1-repo-scaffold-and-css-tokens: done
   1-2-mongo-snapshot-script: done
-  1-3-discord-oauth-reuse: backlog
+  1-3-discord-oauth-reuse: done
 
   epic-2: backlog
   2-1-character-dossier-views: backlog
