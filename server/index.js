@@ -21,6 +21,7 @@ import { connectDb, closeDb } from './db.js';
 import authRouter from './routes/auth.js';
 import charactersRouter from './routes/characters.js';
 import worldRouter from './routes/world.js';
+import loreRouter from './routes/lore.js';
 import { requireAuth } from './middleware/auth.js';
 
 export function createApp() {
@@ -81,6 +82,14 @@ export function createApp() {
   // per-viewer projection beyond the login gate — but it still allowlist-projects
   // every holder object (never a raw-document spread). No new auth logic.
   app.use('/api', worldRouter);
+
+  // Lore router (Story 2.3). Mounted AFTER the auth gate, alongside the characters
+  // and world routers. It reads NO Mongo and issues NO writes — its only I/O is
+  // read-only fs reads of the committed markdown under server/content/lore/. The
+  // login gate is what keeps the lore CONTENT out of anonymous hands (it is served
+  // through this API, never baked into un-gated Netlify static HTML). No new auth
+  // logic; the route never reads req.user.
+  app.use('/api', loreRouter);
 
   return app;
 }

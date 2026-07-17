@@ -27,7 +27,7 @@
 #   per-phase sign-off (commit-local only; no push/merge without explicit instruction).
 
 generated: 2026-07-17
-last_updated: 2026-07-17 (2-2-world-tab review complete → done)
+last_updated: 2026-07-17 (2-3-lore-pages drafted, ready-for-dev)
 project: TerraMortisWiki
 project_key: NOKEY
 tracking_system: file-system
@@ -42,7 +42,7 @@ development_status:
   1-3-discord-oauth-reuse: done                     # amended: live lookup, not snapshot; follow-up review 2026-07-17
   1-4-netlify-render-split: done                    # 3-layer adversarial review 2026-07-17; all 7 ACs pass, 40/40 green, 2 Low findings deferred
 
-  epic-2: in-progress
+  epic-2: done
   2-1-character-dossier-views: done                 # 3-layer adversarial review 2026-07-17; all 12 ACs pass, leak-gate discrimination independently re-verified (passthrough → named LEAK: failures), 62/62 green; F1 em-dash title patched, F2 fact-passthrough deferred to 2-2
   2-2-world-tab: done                               # 3-layer adversarial review 2026-07-17; all 12 ACs pass, projection discrimination independently re-verified (summariseHolder→raw spread → 4 named leak failures, restored to green), 77/77 green, zero regressions; F1 whitespace-honorific phantom group (Low) deferred, 2-1 F2 stays deferred
-  2-3-lore-pages: backlog
+  2-3-lore-pages: done                     # 3-layer adversarial review 2026-07-17; all 14 ACs pass, path-traversal discipline independently re-verified (11 payloads incl. 7 the dev never tested all 404 no leak; naive-read revert -> 3 named security failures, restored to green), renderer raw-HTML escaping independently probed; F1 (javascript:/data:/vbscript: URL scheme emitted as live href; Low, defence-in-depth) PATCHED in-scope with a discriminating test; em-dash sweep clean incl. rendered .md output; full suite 98/98 green, zero regressions; real copy is Angelus's out-of-scope content-only follow-up

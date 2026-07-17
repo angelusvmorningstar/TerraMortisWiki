@@ -95,6 +95,17 @@ Story 2-2 must reuse this projection rather than re-deriving redaction. The HTTP
 
 **Office-holding is public knowledge, so this route applies NO per-viewer projection** — the assembled view is identical for every logged-in viewer (no owner tier, no `revealed_to`, no `req.user` read). It does NOT read `character_dossier` facts. **It still allowlist-projects every holder object** (`buildWorldView` / `summariseHolder` in `server/routes/world.js`), never a raw-document spread: `getCharacters()` / `getTerritories()` hand it full documents, and the repo convention is that a field added upstream must never silently leak. A later change must keep the named allowlist rather than regressing to `{ ...character }`. The HTTP-level projection test in `server/routes/world.test.js` fails against a raw-document spread, and asserts the retired-character sanity check (a stale `regent_id` pointing at a retired character renders the seat vacant, never that character's name).
 
+## Lore API (story 2-3)
+
+- `GET /api/lore` — the ordered lore manifest as `[{ slug, title }]` (setting primer, game guide, rules, friendly errata), no file bodies.
+- `GET /api/lore/:slug` — one rendered lore page as `{ slug, title, html }`. `404 NOT_FOUND` for any slug not in the manifest; `500 CONTENT_ERROR` (modelled, no path/stack) if a manifest slug's backing file is missing on disk.
+
+Lore is **login-gated, in-repo editorial markdown** — NOT Mongo-backed, and NOT baked into static Netlify HTML. The `.md` files live under **`server/content/lore/`** (forced there by `render.yaml`'s `rootDir: server` and by the login-gate requirement that content is API-served, not Netlify-served), and this is the first content router that reads from the filesystem rather than Mongo — read-only `fs` reads, zero Mongo, zero writes. The route is behind `requireAuth` (mounted after `app.use(requireAuth)` in `server/index.js`, alongside the characters and world routers), so a logged-out request for lore content gets the same login redirect a logged-out character request gets.
+
+The `:slug` is **allowlist-validated against the manifest before any filesystem read** (no path traversal): a slug not in the manifest returns `404` and reads nothing, and a resolved path is containment-checked against the lore directory as defence in depth. Rendering goes through a pure, unit-tested `renderLoreMarkdown(md)` (dependency-free subset: headings, paragraphs, bold/italic, inline + fenced code, lists, links, block quotes, rules) that escapes raw HTML in the source rather than passing it through.
+
+The four committed `.md` files are **placeholder copy**; swapping in the real setting/guide/rules/errata text (in particular the friendly-errata plain-language rewrite of `../TM Suite/data/reference/`) is a **content-only edit** — edit the `.md`, redeploy the API — that needs **no code change**.
+
 ## Deployment (Netlify + Render)
 
 Mirrors TM Suite's own split exactly: a static frontend on Netlify, an API on Render, with Netlify proxying `/auth/*` and `/api/*` through to Render so every request is same-origin from the browser's point of view.
@@ -123,4 +134,4 @@ render.yaml         Render Blueprint: web service, rootDir=server, npm ci / npm 
 specs/              PRD, architecture, epics, stories
 ```
 
-Later stories add `content/lore/` (static lore markdown) and further `public/` pages (world tab, lore) as Epic 2 continues.
+Story 2-3 added `server/content/lore/` (static, login-gated lore markdown, served by the API) and the `public/lore.html` + `public/lore-page.html` pages.
