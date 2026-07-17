@@ -97,6 +97,7 @@
 .char-card__body { min-width: 0; }
 
 .char-card__name {
+  display: block;
   font-family: var(--fh);
   font-size: 1.05rem;
   font-weight: 700;
