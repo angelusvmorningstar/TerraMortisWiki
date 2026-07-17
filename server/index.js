@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { config } from './config.js';
 import { connectDb, closeDb } from './db.js';
 import authRouter from './routes/auth.js';
+import charactersRouter from './routes/characters.js';
 import { requireAuth } from './middleware/auth.js';
 
 export function createApp() {
@@ -68,6 +69,11 @@ export function createApp() {
   app.get('/api/me', (req, res) => {
     res.json({ user: req.user });
   });
+
+  // Content router (Story 2.1). Mounted AFTER the auth gate: every route it
+  // exposes has req.user populated, and the owner-vs-summary projection inside
+  // it is the SOLE authorisation boundary for character/dossier data.
+  app.use('/api', charactersRouter);
 
   return app;
 }

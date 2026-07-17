@@ -1,0 +1,273 @@
+/* ══════════════════════════════════════════
+   COMPONENTS — card / grid / chip / portrait vocabulary for the content pages
+   (story 2-1: character-dossier-views).
+
+   Ported (not forked) from ../TM Suite/public/css/components.css — the same
+   .char-grid / .char-card / chip shapes, adapted to this site's needs. Every
+   colour/spacing value flows through a theme.css token: no bare hex, no rgba(),
+   no inline styles. British English throughout.
+   ══════════════════════════════════════════ */
+
+/* Wider content column than the login hero — the roster/profile need room. */
+.content {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+}
+
+.content__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.75rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--bdr2);
+}
+
+.content__title {
+  margin: 0;
+  font-family: var(--fh-decorative);
+  font-size: clamp(1.8rem, 5vw, 2.6rem);
+  font-weight: 700;
+  color: var(--gold2);
+}
+
+.content__eyebrow {
+  margin: 0 0 0.4rem;
+  font-family: var(--fh);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.content__count {
+  font-family: var(--fl);
+  font-size: 0.85rem;
+  color: var(--txt3);
+}
+
+.backlink {
+  display: inline-block;
+  margin-bottom: 1.25rem;
+  font-family: var(--fh);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.backlink:hover { color: var(--gold2); }
+
+/* ── Character grid + cards ── */
+.char-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+
+.char-card {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  background: var(--surf);
+  border: 1px solid var(--bdr2);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  text-decoration: none;
+  color: var(--txt);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.char-card:hover {
+  border-color: var(--bdr3);
+  background: var(--surf2);
+}
+
+/* Retired characters: muted/marked, never hidden (AC #9). */
+.char-card--retired { opacity: 0.72; }
+.char-card--retired .char-card__name { color: var(--txt3); }
+
+.char-card__body { min-width: 0; }
+
+.char-card__name {
+  font-family: var(--fh);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--gold2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.char-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
+/* ── Faction chips ── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--fl);
+  font-size: 0.68rem;
+  font-variant: small-caps;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--txt2);
+  background: var(--surf2);
+  border: 1px solid var(--bdr);
+  border-radius: 10px;
+  padding: 0.12rem 0.55rem;
+}
+
+.chip--cov {
+  color: var(--accent);
+  border-color: var(--bdr2);
+}
+
+.chip--retired {
+  color: var(--txt3);
+  font-variant: small-caps;
+}
+
+/* ── CSS-only portrait placeholder (architecture.md → "Portraits") ──
+   The initial letter on a tokenised gold-tinted tile. No image path exists in
+   v1 — this is the ONLY portrait treatment, not a fallback. */
+.portrait {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.9rem;
+  height: 2.9rem;
+  border-radius: 8px;
+  background: var(--gold-a15);
+  border: 1px solid var(--bdr2);
+  font-family: var(--fh-decorative);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--gold2);
+  user-select: none;
+}
+
+.portrait--lg {
+  width: 6rem;
+  height: 6rem;
+  border-radius: 12px;
+  font-size: 3rem;
+}
+
+/* ── Profile page ── */
+.profile__head {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.profile__id { min-width: 0; }
+
+.profile__name {
+  margin: 0;
+  font-family: var(--fh-decorative);
+  font-size: clamp(1.6rem, 4.5vw, 2.4rem);
+  font-weight: 700;
+  color: var(--gold2);
+}
+
+.profile__factions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.profile__section {
+  margin-top: 2rem;
+}
+
+.profile__section-title {
+  font-family: var(--fh);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 0.9rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--bdr);
+}
+
+/* Dossier facts */
+.facts { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.fact {
+  background: var(--surf);
+  border: 1px solid var(--bdr);
+  border-left: 3px solid var(--gold-a30);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+}
+
+.fact__tag {
+  font-family: var(--fl);
+  font-size: 0.68rem;
+  font-variant: small-caps;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--txt3);
+  margin-bottom: 0.25rem;
+}
+
+.fact__value {
+  font-family: var(--ft);
+  font-size: 0.98rem;
+  color: var(--txt);
+}
+
+/* Owner-tier sheet fields (only rendered when the API returned the owner tier). */
+.sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.75rem 1.25rem;
+}
+
+.sheet-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.sheet-row__label {
+  font-family: var(--fl);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--txt3);
+}
+
+.sheet-row__value {
+  font-family: var(--ft);
+  font-size: 1rem;
+  color: var(--txt);
+}
+
+/* Honest "not much is known" empty state (AC #9) — plain, never a bug banner. */
+.empty-state {
+  background: var(--surf);
+  border: 1px dashed var(--bdr2);
+  border-radius: 8px;
+  padding: 1.5rem;
+  text-align: center;
+  font-family: var(--ft);
+  font-size: 0.98rem;
+  color: var(--txt3);
+}

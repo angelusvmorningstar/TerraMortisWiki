@@ -75,9 +75,23 @@ The whole site is behind Discord login: every route except `GET /auth/discord`, 
 
 For local development only (never when `NODE_ENV=production`), sending `Authorization: Bearer local-test-token` satisfies `requireAuth` without a real Discord round-trip, mirroring TM Suite's `local-test-token` pattern.
 
+## Content API (story 2-1)
+
+Two read-only endpoints, both behind `requireAuth` (mounted after `app.use(requireAuth)` in `server/index.js`, alongside `GET /api/me`):
+
+- `GET /api/characters` — the full roster (active and retired), read live from Mongo. Every entry carries ONLY the summary whitelist (`_id`, `name`, `honorific`, `moniker`, `clan`, `covenant`, `bloodline`, `apparent_age`, `retired`), sorted by `sortName` (`moniker || name`). No owner-only field ever appears here.
+- `GET /api/characters/:id` — one character's profile, projected per the viewer. `404` on an unknown id.
+
+**The owner-vs-summary projection in `server/routes/characters.js` is the SOLE authorisation boundary for character/dossier data — there is no second line of defence.** `getCharacters()` / `getDossiers()` deliberately return full, unredacted documents (per-viewer redaction can't be a fixed Mongo projection — it depends on who is asking), so the route MUST do the redaction before the response leaves Express:
+
+- **Owner tier** (viewer's `character_ids` includes the character `_id`, string-compared): the full character document plus ALL of its `character_dossier` facts, including `st_hidden` ones.
+- **Summary tier** (everyone else): built by **allowlist construction, never denylist deletion** — a NEW object from the named whitelist only, so a field added to the `characters` schema upstream can never silently leak. Plus the facts allowed by the visibility rule: a fact is shown iff `st_hidden !== true`, OR the viewer's own character `_id` is in the fact's `revealed_to` array (missing/null = revealed to no one).
+
+Story 2-2 must reuse this projection rather than re-deriving redaction. The HTTP-level leak tests in `server/routes/characters.test.js` assert both secret channels (owner-only fields and `st_hidden` facts) against the serialised response body; a regression to a passthrough is caught there.
+
 ## Deployment (Netlify + Render)
 
-Mirrors TM Suite's own split exactly: a static frontend on Netlify, an API on Render, with Netlify proxying `/auth/*` (and later `/api/*`) through to Render so every request is same-origin from the browser's point of view.
+Mirrors TM Suite's own split exactly: a static frontend on Netlify, an API on Render, with Netlify proxying `/auth/*` and `/api/*` through to Render so every request is same-origin from the browser's point of view.
 
 **One-time setup, in this order** (the Discord registration needs the Netlify URL to exist first):
 
@@ -92,12 +106,15 @@ server/            Express API ONLY (auth, live read-only Mongo reads) — deplo
   db.js             live Mongo connection
   mongo-store.js    live accessors (getPlayers, getCharacters, getDossiers, getTerritories, getPlayerByDiscordId)
   routes/, middleware/
+  routes/characters.js  content router: GET /api/characters + /:id, owner-vs-summary projection (the sole auth boundary)
 public/             pure static site — deployed to Netlify
-  css/              design tokens (theme.css) + base layout, ported from TM Suite
-  login.html + js/auth/  the Discord OAuth redirect_uri landing page
-netlify.toml        publish=public, /auth proxy redirect to Render, root serves login.html
+  css/              design tokens (theme.css) + base layout + components.css, ported from TM Suite
+  login.html + js/auth/       the Discord OAuth redirect_uri landing page
+  characters.html + character.html + js/characters/  the roster and per-character profile pages
+  js/data/          display.js (ported displayName/sortName) + api.js (authed fetch, redirect-on-401)
+netlify.toml        publish=public, /auth + /api proxy redirects to Render, root serves login.html
 render.yaml         Render Blueprint: web service, rootDir=server, npm ci / npm start
 specs/              PRD, architecture, epics, stories
 ```
 
-Later stories add `content/lore/` (static lore markdown) and further `public/` pages (character dossiers, world tab) once Epic 2 starts.
+Later stories add `content/lore/` (static lore markdown) and further `public/` pages (world tab, lore) as Epic 2 continues.

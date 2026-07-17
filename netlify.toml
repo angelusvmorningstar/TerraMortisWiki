@@ -23,10 +23,18 @@
 
 # Proxy auth requests to the Render-hosted Express API. Update the 'to' host to
 # the real Render service URL once the Blueprint has been imported (README step 1).
-# (Later stories add a matching /api/* rule for content routes.)
 [[redirects]]
   from = "/auth/*"
   to = "https://terra-mortis-wiki-api.onrender.com/auth/:splat"
+  status = 200
+  force = true
+
+# Proxy content-API requests to the same Render service (story 2-1). Mirrors the
+# /auth/* rule so /api/characters (and later stories' content routes) are
+# same-origin from the browser's point of view.
+[[redirects]]
+  from = "/api/*"
+  to = "https://terra-mortis-wiki-api.onrender.com/api/:splat"
   status = 200
   force = true
 
