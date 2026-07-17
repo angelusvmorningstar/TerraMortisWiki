@@ -27,7 +27,7 @@
 #   per-phase sign-off (commit-local only; no push/merge without explicit instruction).
 
 generated: 2026-07-17
-last_updated: 2026-07-17 (2-1-character-dossier-views story created → ready-for-dev)
+last_updated: 2026-07-17 (2-2-world-tab review complete → done)
 project: TerraMortisWiki
 project_key: NOKEY
 tracking_system: file-system
@@ -44,5 +44,5 @@ development_status:
 
   epic-2: in-progress
   2-1-character-dossier-views: done                 # 3-layer adversarial review 2026-07-17; all 12 ACs pass, leak-gate discrimination independently re-verified (passthrough → named LEAK: failures), 62/62 green; F1 em-dash title patched, F2 fact-passthrough deferred to 2-2
-  2-2-world-tab: backlog
+  2-2-world-tab: done                               # 3-layer adversarial review 2026-07-17; all 12 ACs pass, projection discrimination independently re-verified (summariseHolder→raw spread → 4 named leak failures, restored to green), 77/77 green, zero regressions; F1 whitespace-honorific phantom group (Low) deferred, 2-1 F2 stays deferred
   2-3-lore-pages: backlog

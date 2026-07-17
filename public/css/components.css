@@ -271,3 +271,81 @@
   font-size: 0.98rem;
   color: var(--txt3);
 }
+
+/* ══════════════════════════════════════════
+   WORLD / COURT — office-holder rows + title groups (story 2-2: world-tab).
+   Tokens-only additions on top of the shared vocabulary above. Territory office
+   cards list a Regent and a Lieutenant seat; the court section reuses .char-grid
+   / .char-card for its holders (grouped by honorific). No bare hex / rgba /
+   inline styles.
+   ══════════════════════════════════════════ */
+
+.office-card {
+  background: var(--surf);
+  border: 1px solid var(--bdr2);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.office-card__territory {
+  margin: 0 0 0.75rem;
+  font-family: var(--fh);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--gold2);
+}
+
+.office-seats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.75rem;
+}
+
+.office-seat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  background: var(--surf2);
+  border: 1px solid var(--bdr);
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  text-decoration: none;
+  transition: border-color 0.15s;
+}
+
+a.office-seat:hover { border-color: var(--bdr3); }
+
+.office-seat__label {
+  font-family: var(--fl);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--txt3);
+}
+
+.office-seat__holder {
+  font-family: var(--fh);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--gold2);
+}
+
+.office-seat--vacant .office-seat__vacant {
+  font-family: var(--ft);
+  font-size: 1rem;
+  font-style: italic;
+  color: var(--txt3);
+}
+
+.title-group { margin-bottom: 1.75rem; }
+
+.title-group__heading {
+  margin: 0 0 0.9rem;
+  font-family: var(--fh);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}

@@ -20,6 +20,7 @@ import { config } from './config.js';
 import { connectDb, closeDb } from './db.js';
 import authRouter from './routes/auth.js';
 import charactersRouter from './routes/characters.js';
+import worldRouter from './routes/world.js';
 import { requireAuth } from './middleware/auth.js';
 
 export function createApp() {
@@ -74,6 +75,12 @@ export function createApp() {
   // exposes has req.user populated, and the owner-vs-summary projection inside
   // it is the SOLE authorisation boundary for character/dossier data.
   app.use('/api', charactersRouter);
+
+  // World / Court router (Story 2.2). Mounted AFTER the auth gate, alongside the
+  // characters router. Office-holding is public knowledge, so it applies NO
+  // per-viewer projection beyond the login gate — but it still allowlist-projects
+  // every holder object (never a raw-document spread). No new auth logic.
+  app.use('/api', worldRouter);
 
   return app;
 }

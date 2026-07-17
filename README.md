@@ -89,6 +89,12 @@ Two read-only endpoints, both behind `requireAuth` (mounted after `app.use(requi
 
 Story 2-2 must reuse this projection rather than re-deriving redaction. The HTTP-level leak tests in `server/routes/characters.test.js` assert both secret channels (owner-only fields and `st_hidden` facts) against the serialised response body; a regression to a passthrough is caught there.
 
+## World / Court API (story 2-2)
+
+- `GET /api/world` — the assembled office-holder view, read live from Mongo (behind `requireAuth`, mounted after `app.use(requireAuth)` in `server/index.js` alongside the characters router). Returns `{ territories: [{ territory, regent, lieutenant }], titleGroups: [{ honorific, holders }] }`. Territory seats join `territories.regent_id` / `lieutenant_id` (stringified character ids) against the characters collection, `String()`-normalised on both sides; the court section groups characters by their live `honorific` value (no hardcoded enum). Each holder object carries ONLY `_id`, `name`, `honorific`, `moniker` so the frontend can link to the Story 2-1 profile page.
+
+**Office-holding is public knowledge, so this route applies NO per-viewer projection** — the assembled view is identical for every logged-in viewer (no owner tier, no `revealed_to`, no `req.user` read). It does NOT read `character_dossier` facts. **It still allowlist-projects every holder object** (`buildWorldView` / `summariseHolder` in `server/routes/world.js`), never a raw-document spread: `getCharacters()` / `getTerritories()` hand it full documents, and the repo convention is that a field added upstream must never silently leak. A later change must keep the named allowlist rather than regressing to `{ ...character }`. The HTTP-level projection test in `server/routes/world.test.js` fails against a raw-document spread, and asserts the retired-character sanity check (a stale `regent_id` pointing at a retired character renders the seat vacant, never that character's name).
+
 ## Deployment (Netlify + Render)
 
 Mirrors TM Suite's own split exactly: a static frontend on Netlify, an API on Render, with Netlify proxying `/auth/*` and `/api/*` through to Render so every request is same-origin from the browser's point of view.
