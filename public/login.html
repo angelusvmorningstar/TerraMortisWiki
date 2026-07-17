@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terra Mortis Wiki — Log in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Lato:wght@400;600;700;900&family=Libre+Baskerville:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/theme.css">
+<link rel="stylesheet" href="/css/base.css">
+</head>
+<body>
+<div class="page">
+  <div class="hero">
+    <p class="hero__eyebrow">Terra Mortis</p>
+    <h1 class="hero__title">Wiki</h1>
+    <p class="hero__lede" id="lede">Sign in with the same Discord account you use for TM Suite.</p>
+    <p class="hero__status" id="status" hidden></p>
+    <a class="btn" id="login-btn" href="/auth/discord" hidden>Log in with Discord</a>
+  </div>
+</div>
+
+<script type="module">
+  import { parseCallbackParams, buildCallbackRequest, stripCallbackParams, saveAuth, getToken, getUser } from './js/auth/login-core.js';
+
+  // Same-origin in production (Netlify's /auth/* redirect proxies to Render);
+  // only local dev, where the static site and API run on different ports,
+  // needs an explicit host — mirrors ../TM Suite/public/js/data/api.js.
+  const API_BASE = location.hostname === 'localhost' ? 'http://localhost:3000' : '';
+
+  const lede = document.getElementById('lede');
+  const status = document.getElementById('status');
+  const loginBtn = document.getElementById('login-btn');
+
+  function showStatus(message, isError) {
+    status.textContent = message;
+    status.hidden = false;
+    status.classList.toggle('hero__status--error', !!isError);
+  }
+
+  function showLoggedIn(user) {
+    lede.textContent = `Logged in as ${user.discord_username || user.username || 'you'}.`;
+    loginBtn.hidden = true;
+  }
+
+  async function handleCallback(code, state) {
+    showStatus('Completing sign-in…', false);
+    const req = buildCallbackRequest(code, state);
+    let res;
+    try {
+      res = await fetch(`${API_BASE}${req.path}`, { method: req.method, headers: req.headers, body: req.body });
+    } catch {
+      showStatus('Could not reach the server. Check your connection and try again.', true);
+      loginBtn.hidden = false;
+      return;
+    }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      showStatus(err.message || 'Login failed.', true);
+      loginBtn.hidden = false;
+      return;
+    }
+    const data = await res.json();
+    saveAuth(localStorage, data);
+    status.hidden = true;
+    showLoggedIn(data.user);
+  }
+
+  async function init() {
+    const callback = parseCallbackParams(location.href);
+    if (callback) {
+      history.replaceState({}, '', stripCallbackParams(location.href));
+      await handleCallback(callback.code, callback.state);
+      return;
+    }
+
+    const token = getToken(localStorage);
+    const user = getUser(localStorage);
+    if (token && user) {
+      showLoggedIn(user);
+      return;
+    }
+
+    loginBtn.hidden = false;
+  }
+
+  init();
+</script>
+</body>
+</html>

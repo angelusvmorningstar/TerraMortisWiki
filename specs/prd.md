@@ -28,9 +28,18 @@ Players forget their own character's history, forget who holds what court office
 
 ## Non-functional requirements
 
-- **Never writes to `tm_suite`.** All writes happen from ad hoc scripts run from the TM Suite dev environment, never from this app's deployed service.
-- **Data freshness**: rebuild-on-command, not live query. Angelus triggers a snapshot regeneration (realistically at the close of a downtime cycle), commits it, and the site picks it up on its next deploy. No live Mongo connection in the deployed service at all.
+- **Never writes to `tm_suite`.** All writes happen from TM Suite's own admin flows or ad hoc scripts run from the TM Suite dev environment, never from this app's deployed service.
+- **Data freshness: live query, not a snapshot.** Reversed from the original plan — see "Revision: live reads, not a snapshot" below. The deployed API reads `tm_suite` directly, read-only, on every request. TM Suite, the Cockpit, and this Wiki all read the same live collections, so a change made anywhere is reflected everywhere with no separate rebuild step and no second copy of the truth to fall out of sync.
 - **Portraits**: AI-generated character portraits are never committed or served by this app. Every portrait slot renders a placeholder, always — this is permanent behaviour, not a temporary gap.
+
+## Revision: live reads, not a snapshot
+
+The original plan (still visible in early commit history) was a script Angelus runs on command that snapshots Mongo into a committed JSON file, with the deployed service reading only that file. Angelus reversed this after reflecting that the Wiki is meant to reflect reality, and TM Suite/the Cockpit/the Wiki should all speak to one live source of truth rather than each holding a copy that can drift. Concretely:
+
+- The deployed API (on Render) holds a live, read-only MongoDB Atlas connection and queries `tm_suite` per request — the same shape `tm-suite-api` already uses, just with a read-only database user instead of the full-access one.
+- This also removes a real risk the snapshot approach carried: a committed `data/snapshot.json` held every character's full document — including ST-only secrets — in git history, protected only by repo privacy. Live reads never write that data to a file at all.
+- The whitelist/reveals design is unchanged — same fixed-field summary for non-owned characters, same fact-level `revealed_to` extension on `character_dossier` (now added to TM Suite's own schema file directly, since that's the actual source of truth) — only *where* it's read from changes.
+- This applies equally to the future map/territory data (v2): read live off `territories`, not a cached copy.
 - **Visual design**: reuse TM Suite's normalised CSS design tokens and components (`../TM Suite/public/css/theme.css`, `../TM Suite/public/css/components.css`) — port what's needed, don't invent a parallel design system, don't hardcode hex/inline styles.
 - **British English**, no em-dashes, throughout all app copy.
 

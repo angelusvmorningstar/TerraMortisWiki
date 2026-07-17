@@ -1,16 +1,19 @@
-// server/middleware/auth.js — requireAuth (Story 1.3).
+// server/middleware/auth.js — requireAuth (Story 1.3; amended by Story 1.2 rev 2).
 //
-// Ported near-verbatim from `../TM Suite/server/middleware/auth.js`, with ONE
-// deliberate change: player resolution reads the in-memory SNAPSHOT (Story 1.2)
-// instead of live Mongo — the deployed Wiki service holds no Mongo connection.
+// Ported near-verbatim from `../TM Suite/server/middleware/auth.js`. Player
+// resolution now goes through the LIVE, read-only Mongo `players` lookup
+// (`server/mongo-store.js`, Story 1.2 rev 2) — this is a straight port of TM
+// Suite's real behaviour, replacing the retired snapshot detour. The CSRF state
+// fix, the NODE_ENV allowlist bypass gate, and the error-response shapes are
+// unchanged from Story 1.3's reviewed build.
 //
 // Shape (unchanged from TM Suite): the frontend holds the Discord access_token
 // itself and sends it as `Authorization: Bearer <token>`. This middleware
 // re-validates that token against Discord's `/users/@me` and re-derives req.user
-// from snapshot data, caching the (token -> user) result 60s in-memory so most
-// requests never hit Discord.
+// from the live `players` lookup, caching the (token -> user) result 60s
+// in-memory so most requests never hit Discord.
 
-import { getPlayerByDiscordId } from '../snapshot-store.js';
+import { getPlayerByDiscordId } from '../mongo-store.js';
 
 const DISCORD_API = 'https://discord.com/api/v10';
 
@@ -19,12 +22,12 @@ const DISCORD_API = 'https://discord.com/api/v10';
 const tokenCache = new Map();
 const CACHE_TTL = 60_000; // 1 minute
 
-// Build the canonical req.user from a Discord profile + a snapshot player.
+// Build the canonical req.user from a Discord profile + a resolved player.
 // AC #2/#6: character_ids is always an array (copied so callers can't mutate the
-// snapshot), with no assumption anywhere that it has exactly one element.
-// `player_id` is the player's discord_id: the snapshot deliberately omits the
-// Mongo `_id` (auth-field whitelist, Story 1.2), so discord_id is the only
-// stable player identifier available here.
+// shared player object), with no assumption anywhere that it has exactly one
+// element. `player_id` is the player's discord_id: the auth-field whitelist
+// projection deliberately omits the Mongo `_id` (Story 1.2), so discord_id is
+// the only stable player identifier available here.
 export function buildUserFromPlayer(discordUser, player) {
   return {
     id: discordUser.id,
@@ -92,10 +95,24 @@ export async function requireAuth(req, res, next) {
 
   const discordUser = await userRes.json();
 
-  // Resolve the player from the SNAPSHOT (not live Mongo). A valid Discord
-  // identity with no matching player record is a clear 403, never a crash and
-  // never a silent pass-through (AC #4).
-  const player = getPlayerByDiscordId(discordUser.id);
+  // Resolve the player from the live, read-only Mongo `players` lookup. A valid
+  // Discord identity with no matching player record is a clear 403, never a
+  // crash and never a silent pass-through (AC #4).
+  //
+  // The lookup is now a LIVE Mongo query (Story 1.2 rev 2), so unlike the retired
+  // in-memory snapshot .find() it can REJECT (DB down / timeout / connection
+  // reset). Wrap it exactly as the Discord fetch above is wrapped: a dependency
+  // outage must be a modelled response, not a raw Express-default 500 (which in
+  // non-production also leaks a stack trace). 503 — not 401 — because the token
+  // WAS validated; this is a server-side dependency failure, so we must not tell
+  // a legitimately-authenticated client its token is invalid (which would make
+  // the frontend discard a good session on a transient blip).
+  let player;
+  try {
+    player = await getPlayerByDiscordId(discordUser.id);
+  } catch {
+    return res.status(503).json({ error: 'AUTH_ERROR', message: 'Player lookup temporarily unavailable' });
+  }
   if (!player) {
     return res.status(403).json({ error: 'FORBIDDEN', message: 'No player record found — contact an ST' });
   }

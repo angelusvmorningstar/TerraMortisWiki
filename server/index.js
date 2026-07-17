@@ -1,91 +1,70 @@
-// Terra Mortis Wiki — thin Express service (story 1-1 skeleton).
-// This story only establishes the app skeleton, static CSS, and a placeholder
-// home page. Auth, snapshot loading, and real routes arrive in later stories.
+// Terra Mortis Wiki — thin Express API (Story 1.4: netlify-render-split).
+//
+// This service is a PURE JSON/auth API. It serves NO static files: there is no
+// express.static, no /css mount, and no home-page route. The frontend (the login
+// page, and later stories' content pages) is a separate static site on Netlify;
+// Netlify's redirect proxy forwards /auth/* (and later /api/*) here to Render, so
+// from the browser every request is same-origin. See specs/architecture.md →
+// "Shape (revised — live reads, not a snapshot)".
+//
+// RETIRED HERE (intentionally, not a regression): Story 1.1's placeholder
+// `homePage()` route + its `server/index.test.js` smoke test, and Story 1.3's
+// `/css` static mount + its two static-serving tests. A static home page and CSS
+// belong to Netlify now, not this API. Story 1.1's and 1.3's story files remain
+// as the historical record of what they built.
 
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { config } from './config.js';
+import { connectDb, closeDb } from './db.js';
 import authRouter from './routes/auth.js';
 import { requireAuth } from './middleware/auth.js';
-import { loadSnapshot } from './snapshot-store.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const PUBLIC_DIR = join(__dirname, '..', 'public');
-
-// Placeholder home page. All colour/font styling flows through the ported
-// design tokens in /css/theme.css and the layout in /css/base.css — no inline
-// styles, no bare hex (AC #2).
-function homePage() {
-  return `<!doctype html>
-<html lang="en" data-theme="dark">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Terra Mortis Wiki</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@400;700&family=Lato:wght@400;600;700;900&family=Libre+Baskerville:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/theme.css">
-  <link rel="stylesheet" href="/css/base.css">
-</head>
-<body>
-  <main class="page">
-    <section class="hero">
-      <p class="hero__eyebrow">Vampire: The Requiem 2e</p>
-      <h1 class="hero__title">Terra Mortis Wiki</h1>
-      <p class="hero__lede">Chronicle companion. This is the placeholder home page for the skeleton build.</p>
-    </section>
-  </main>
-</body>
-</html>`;
-}
 
 export function createApp() {
   const app = express();
 
-  // Load the snapshot into memory once at boot (Story 1.3). No-op if a snapshot
-  // has already been loaded or test-injected via snapshot-store.setSnapshot().
-  loadSnapshot();
+  // CORS — ported from `../TM Suite/server/index.js`'s manual echo middleware,
+  // keyed off config.CORS_ORIGIN. It matters only for LOCAL dev, where the static
+  // frontend and this API run on different origins; in production the Netlify
+  // proxy makes traffic same-origin, so this is mostly inert there (Story 1.4
+  // dev note). In non-production it echoes any Origin back (dev convenience);
+  // in production it echoes ONLY an allowlisted origin.
+  const allowedOrigins = config.CORS_ORIGIN.split(',').map((o) => o.trim());
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && (allowedOrigins.includes(origin) || config.NODE_ENV !== 'production')) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    if (req.method === 'OPTIONS') {
+      res.status(204).end();
+      return;
+    }
+    next();
+  });
 
   // Parse JSON bodies (the OAuth callback POSTs { code, state }) and cookies
   // (the OAuth state CSRF cookie set by GET /auth/discord).
   app.use(express.json());
   app.use(cookieParser());
 
-  // --- Unauthenticated login surface -------------------------------------
-  // The whole site sits behind Discord login (PRD; AC #4). But a login gate
-  // needs a public entry point — the shell that hosts the "Log in with Discord"
-  // button and the OAuth routes that start/finish the flow. These, plus the
-  // static CSS the shell needs to render, are the ONLY anonymous surface. None
-  // of them serve snapshot/player data, so there is no anonymous CONTENT tier —
-  // which is what AC #4 forbids. (See Story 1.3 dev notes for the full
-  // resolution of the tension with Story 1.1's public `/` smoke test.)
-
-  // Ported CSS ONLY — public so the logged-out login shell renders. Deliberately
-  // scoped to /css rather than the whole public/ tree: mounting express.static on
-  // PUBLIC_DIR itself would mean any future story that drops rendered content
-  // under public/ (character pages, world-tab data, etc.) is served with ZERO
-  // auth check by default — the exact cross-player leak this app exists to
-  // prevent. Anything content-bearing must be registered as a route AFTER the
-  // requireAuth gate below, never dropped into a statically-served directory.
-  app.use('/css', express.static(join(PUBLIC_DIR, 'css')));
-
-  // Placeholder home / login-landing page (Story 1.1, kept public).
-  app.get('/', (_req, res) => {
-    res.type('html').send(homePage());
-  });
-
-  // Discord OAuth routes (public — they ARE the login flow). AC #1/#2.
+  // --- Public OAuth surface ----------------------------------------------
+  // The two Discord OAuth routes are the ONLY unauthenticated endpoints — they
+  // ARE the login flow, so they necessarily can't require a session. There is no
+  // anonymous CONTENT tier (PRD; Story 1.3 AC #4): nothing here serves player or
+  // world data without login.
   app.use('/auth', authRouter);
 
   // --- Authentication gate -----------------------------------------------
-  // Everything registered BELOW this line requires a valid session (AC #4).
-  // Future content routers (stories 2-1/2-2/2-3) register after this call.
+  // Everything registered BELOW requires a valid session. Future content routers
+  // (stories 2-1/2-2/2-3) register after this call.
   app.use(requireAuth);
 
-  // Current-session endpoint — the frontend calls this to learn who is logged
-  // in. First gated route; also the concrete route that proves the gate works.
+  // Current-session endpoint — the frontend calls this to learn who is logged in.
   app.get('/api/me', (req, res) => {
     res.json({ user: req.user });
   });
@@ -93,13 +72,15 @@ export function createApp() {
   return app;
 }
 
-// Start listening only when run directly (not when imported by a test).
-const isMain = process.argv[1] === fileURLToPath(import.meta.url);
-if (isMain) {
-  const port = process.env.PORT || 3000;
-  const app = createApp();
-  const server = app.listen(port, () => {
-    console.log(`Terra Mortis Wiki listening on http://localhost:${port}`);
+// Connect to Mongo ONCE at boot, then listen. The long-lived process closes the
+// connection gracefully on SIGTERM/SIGINT (Render sends SIGTERM on deploys /
+// restarts). Tests never reach this path — they inject a fake Db via
+// db.setTestDb and never open a real connection.
+async function start() {
+  await connectDb();
+  const port = config.PORT;
+  const server = createApp().listen(port, () => {
+    console.log(`Terra Mortis Wiki API listening on http://localhost:${port} (${config.NODE_ENV})`);
   });
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
@@ -107,5 +88,22 @@ if (isMain) {
       process.exit(1);
     }
     throw err;
+  });
+}
+
+function shutdown(signal) {
+  console.log(`\n${signal} received — closing Mongo connection and exiting`);
+  closeDb().finally(() => process.exit(0));
+}
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+// Start listening only when run directly (not when imported by a test).
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+if (isMain) {
+  start().catch((err) => {
+    console.error('Failed to start Terra Mortis Wiki API:', err.message);
+    process.exit(1);
   });
 }

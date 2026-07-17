@@ -1,0 +1,28 @@
+# Terra Mortis Wiki — Render Blueprint (Story 1.4: netlify-render-split).
+#
+# One `web` service: the Express API in `server/`. Mirrors the API-service half
+# of `../TM Suite/render.yaml`. The API is the ONLY thing that touches Mongo, and
+# only ever read-only. Secrets / cross-service-dependent values use `sync: false`
+# so they are set by hand in the Render dashboard, never committed here.
+
+services:
+  - type: web
+    name: terra-mortis-wiki-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm ci
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false  # set manually in Render dashboard (secret; a READ-ONLY Atlas user)
+      - key: DISCORD_CLIENT_ID
+        value: 1488404820917223484  # same Discord application as TM Suite (public, not a secret)
+      - key: DISCORD_CLIENT_SECRET
+        sync: false  # set manually in Render dashboard (secret)
+      - key: DISCORD_REDIRECT_URI
+        sync: false  # set once the Netlify domain is known — <netlify-url>/login.html
+      - key: CORS_ORIGIN
+        sync: false  # set once the Netlify domain is known (mostly inert behind the proxy)

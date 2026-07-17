@@ -1,5 +1,9 @@
 # Story 1.2: mongo-snapshot-script
 
+Status: superseded (see `specs/stories/1-2-mongo-read-client.md` and `specs/prd.md` → "Revision: live reads, not a snapshot")
+
+**This story's actual code (`scripts/snapshot.mjs`, `server/snapshot-store.js`, `data/snapshot.json`) has been deleted from the repo by story 1-2's replacement.** This file is kept purely as a historical record of what was built and reviewed at the time — the Senior Developer Review below found real issues (the `ssl=` regex bug, the players-PII test-coverage gap, the write-guard hardening) that were carried forward into the live-read replacement rather than lost.
+
 Status: done
 
 ## Story

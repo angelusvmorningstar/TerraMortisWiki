@@ -1,21 +1,22 @@
-// server/routes/auth.js — Discord OAuth routes (Story 1.3).
+// server/routes/auth.js — Discord OAuth routes (Story 1.3; amended by 1.2 rev 2).
 //
 // Ported from `../TM Suite/server/routes/auth.js`. Same Discord application, same
 // `identify`-only scope, same "frontend holds the Discord access_token" model.
-// The ONE change: the player lookup resolves against the in-memory SNAPSHOT
-// (Story 1.2), not live Mongo — the deployed Wiki service holds no DB connection.
+// Player resolution now goes through the LIVE, read-only Mongo `players` lookup
+// (`server/mongo-store.js`, Story 1.2 rev 2). The CSRF `state` round-trip and the
+// server-pinned `redirect_uri` from Story 1.3's review are unchanged.
 //
 // Auto-link note: TM Suite's version, when a player has no discord_id yet, falls
 // back to matching by discord_username and WRITES the numeric id back to Mongo
-// (first-login convenience). This app never writes to Mongo, so that write-back
-// cannot be replicated. The snapshot is keyed by discord_id; a player whose
-// discord_id was never backfilled in TM Suite is simply unmatchable here until
-// the next snapshot + deploy. Matching is therefore by discord_id only.
+// (first-login convenience). This app NEVER writes to Mongo (CLAUDE.md hard
+// rule), so that write-back is not replicated: matching is by discord_id only. A
+// player whose discord_id was never backfilled in TM Suite's own database is
+// unmatchable here until it is backfilled there.
 
 import { Router } from 'express';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { config } from '../config.js';
-import { getPlayerByDiscordId } from '../snapshot-store.js';
+import { getPlayerByDiscordId } from '../mongo-store.js';
 import { buildUserFromPlayer } from '../middleware/auth.js';
 
 const router = Router();
@@ -60,7 +61,8 @@ router.get('/discord', (req, res) => {
 });
 
 // POST /auth/discord/callback — exchange the authorisation code for a Discord
-// access token, fetch the Discord profile, resolve the matching snapshot player.
+// access token, fetch the Discord profile, resolve the matching player via the
+// live mongo-store lookup.
 //
 // The frontend must forward the `state` Discord returned in its redirect's
 // query string here unchanged - that's what's checked against the cookie set
@@ -120,8 +122,17 @@ router.post('/discord/callback', async (req, res) => {
 
   const discordUser = await userRes.json();
 
-  // Resolve the player from the snapshot (by discord_id only — see file header).
-  const player = getPlayerByDiscordId(discordUser.id);
+  // Resolve the player from the live Mongo lookup (by discord_id only — header).
+  // Wrapped like the two Discord fetches above: the live query can REJECT (DB
+  // down / timeout), a failure mode the retired in-memory snapshot lookup never
+  // had. A dependency outage must be a modelled 503, not a raw Express-default
+  // 500 (AC #4: never a crash). See middleware/auth.js for the 503-not-401 note.
+  let player;
+  try {
+    player = await getPlayerByDiscordId(discordUser.id);
+  } catch {
+    return res.status(503).json({ error: 'AUTH_ERROR', message: 'Player lookup temporarily unavailable' });
+  }
   if (!player) {
     return res.status(403).json({ error: 'FORBIDDEN', message: 'No player record found — contact an ST' });
   }

@@ -1,0 +1,37 @@
+# Terra Mortis Wiki — Netlify config (Story 1.4: netlify-render-split).
+#
+# The frontend is a PURE static site: `public/` is published verbatim, no build
+# step. Mirrors `../TM Suite/netlify.toml`'s shape. The redirect below proxies
+# /auth/* through to the Render-hosted Express API with status 200 (a rewrite,
+# not a 3xx), so from the browser's point of view every request is same-origin
+# against the Netlify domain — which is also why CORS barely matters in
+# production (see specs/architecture.md).
+
+[build]
+  publish = "public"
+
+# Short cache for CSS/JS so deploys take effect quickly.
+[[headers]]
+  for = "/css/*"
+  [headers.values]
+    Cache-Control = "public, max-age=300"
+
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=300"
+
+# Proxy auth requests to the Render-hosted Express API. Update the 'to' host to
+# the real Render service URL once the Blueprint has been imported (README step 1).
+# (Later stories add a matching /api/* rule for content routes.)
+[[redirects]]
+  from = "/auth/*"
+  to = "https://terra-mortis-wiki-api.onrender.com/auth/:splat"
+  status = 200
+  force = true
+
+# Root serves the login page (the OAuth redirect_uri target).
+[[redirects]]
+  from = "/"
+  to = "/login.html"
+  status = 200

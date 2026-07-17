@@ -61,3 +61,36 @@ body {
   font-size: 1.05rem;
   color: var(--txt2);
 }
+
+/* Minimal button component (first introduced by story 1-4's login page).
+   Extend this, don't fork a one-off, when later stories need buttons/links
+   styled the same way. */
+.btn {
+  display: inline-block;
+  margin-top: 1.5rem;
+  padding: 0.7rem 1.8rem;
+  border: 1px solid var(--gold2);
+  border-radius: 6px;
+  background: var(--gold-a12);
+  color: var(--gold2);
+  font-family: var(--fh);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--gold-a20);
+}
+
+.hero__status {
+  margin-top: 1.5rem;
+  font-size: 0.95rem;
+  color: var(--txt2);
+}
+
+.hero__status--error {
+  color: var(--crim2);
+}

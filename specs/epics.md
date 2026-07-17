@@ -4,9 +4,11 @@ Source: `prd.md` (product scope) + `architecture.md` (technical shape). Six stor
 
 ---
 
-## Epic 1 — Foundation &amp; Data Pipeline
+## Epic 1 — Foundation, Live Data Access &amp; Deploy Topology
 
-**Objective**: stand up the repo skeleton, the read-only snapshot pipeline, and Discord OAuth, so every later story has real data and a real login to build against.
+**Objective**: stand up the repo skeleton, a live read-only Mongo connection, Discord OAuth (with a correct redirect flow), and the two-service Netlify/Render split, so every later story has real data, a real login, and a real deploy target to build against.
+
+**Revision note**: story 1-2 originally built a snapshot-script pipeline (Mongo → committed JSON file). That approach is retired — see `prd.md` → "Revision: live reads, not a snapshot." Story 1-2 below is the replacement: a live, read-only Mongo connection module. Story 1-3 is amended in place (its ACs changed; its Dev Agent Record documents both the original build and the rework). Story 1-4 is new — the Netlify/Render deploy split was always implied by "same as TM Suite" but never made a concrete story, and doing it surfaced a real bug in 1-3's original OAuth flow (the redirect_uri can't point at a POST-only route).
 
 ### Story 1-1: repo-scaffold-and-css-tokens
 
@@ -21,32 +23,51 @@ Acceptance criteria:
 
 Source hints: `../TM Suite/public/css/theme.css`, `../TM Suite/public/css/components.css` (read, don't guess at token names — copy what's really there).
 
-### Story 1-2: mongo-snapshot-script
+### Story 1-2: mongo-read-client (supersedes the retired mongo-snapshot-script)
 
-**As** Angelus, **I want** a script I run on command that reads `tm_suite` read-only and writes a committed JSON snapshot, **so that** the site's data reflects reality without ever giving the deployed app live database access.
+**As** the developer of this app, **I want** a live, read-only Mongo connection module with the same accessor shape the retired snapshot-store used, **so that** the API reads `tm_suite` directly and every consumer (TM Suite, the Cockpit, this Wiki) sees the same live truth.
 
 Acceptance criteria:
-- `scripts/snapshot.mjs` connects to `tm_suite` using `MONGODB_URI` from a local `.env` (never committed), reads `characters`, `character_dossier`, `players` (auth fields only — `discord_id`, `role`, `character_ids`, `discord_username`), and `territories` (for `regent_id`/`lieutenant_id`).
-- Output written to `data/snapshot.json` (or clearly-named per-collection files under `data/`), deterministic and diff-friendly (stable key ordering) so commits show real changes.
-- The script is read-only against Mongo — no `updateOne`/`insertOne`/etc. anywhere in it. This is a hard constraint per `CLAUDE.md`.
-- Extend `character_dossier`'s fact shape with the `revealed_to` field as documented in `architecture.md` (schema support only — no authoring UI, no route uses it yet beyond the projection logic in story 2-1 reading it).
-- Running the script twice with no Mongo changes produces byte-identical output (proves determinism).
-- A short section in this story's dev notes documents exactly how Angelus invokes it (command, expected runtime, what "success" looks like) since this is a manual, recurring operation.
+- `server/db.js` connects to `tm_suite` using `MONGODB_URI` from env (mirrors `../TM Suite/server/db.js`'s connect/getDb/getCollection/close shape).
+- `server/mongo-store.js` (replaces `server/snapshot-store.js`) exposes the same accessor names the retired module had — `getPlayers`, `getCharacters`, `getDossiers`, `getTerritories`, `getPlayerByDiscordId` — but each is now `async` and queries Mongo live, per call, instead of reading an in-memory JSON blob. `getPlayers`/`getPlayerByDiscordId` project to the auth-field whitelist (`discord_id`, `role`, `character_ids`, `discord_username`) at query time — nothing else from `players` ever leaves Mongo.
+- The module contains **no write operations** anywhere — no `updateOne`/`insertOne`/`$out`/`$merge`/`db.command`/etc. This is a hard, testable constraint (reuse/adapt the lexical guard test from the retired snapshot script).
+- Tests use a real ephemeral local MongoDB (in-memory or Dockerised test instance) or a well-scoped mock of the driver — never the live `tm_suite` connection. Whichever approach is chosen, justify it in dev notes.
+- `server/snapshot-store.js`, `server/snapshot-store.test.js`, `scripts/snapshot.mjs`, `scripts/snapshot.test.js`, and `data/snapshot.json` are all deleted — nothing in the repo should still reference the snapshot approach.
 
-Source hints: `../TM Suite/server/config.js` (Mongo URI env var convention), `../TM Suite/server/schemas/character_dossier.schema.js` (fact shape to extend), `../TM Suite/server/db.js` (connection pattern, read-only user setup is new — don't copy write-capable credentials).
+Source hints: `../TM Suite/server/db.js`, `../TM Suite/server/config.js`, `../TM Suite/server/schemas/character_dossier.schema.js` (now has `revealed_to` — TM Suite's actual schema file, updated directly, not a mirrored copy in this repo).
 
-### Story 1-3: discord-oauth-reuse
+### Story 1-3: discord-oauth-reuse (amended — live player lookup, redirect_uri bug fixed)
 
 **As** a player, **I want** to log in with the same Discord account I use for TM Suite, **so that** I don't need a second login and the site knows which character(s) are mine.
 
-Acceptance criteria:
-- Routes mirroring `../TM Suite/server/routes/auth.js`: a redirect-to-Discord route and a callback route, using the **same** `DISCORD_CLIENT_ID`/`DISCORD_CLIENT_SECRET` as TM Suite (same Discord application, second registered redirect URI — this is a config/registration step Angelus does in Discord's developer portal, not a code change; document it as a manual setup step in dev notes).
-- `requireAuth` middleware mirroring `../TM Suite/server/middleware/auth.js`: validates the bearer token against Discord, resolves `req.user` from the snapshot's `players` data (not live Mongo), 60s in-memory cache.
+**What changed from the original build**: player resolution now queries live Mongo (via story 1-2's `mongo-store.js`) instead of an in-memory snapshot — this is a smaller change than it sounds, since the accessor interface stayed the same, just made `async`. Everything else from the original story (the CSRF `state` fix, the `NODE_ENV` allowlist fix, the narrowed static-serving fix) carries forward unchanged; those were real security fixes, not snapshot-related.
+
+Acceptance criteria (revised):
+- Routes mirroring `../TM Suite/server/routes/auth.js`, using the **same** `DISCORD_CLIENT_ID`/`DISCORD_CLIENT_SECRET` as TM Suite.
+- `requireAuth` middleware resolves `req.user` via a live, `await`-ed `getPlayerByDiscordId` call (story 1-2), 60s in-memory token cache unchanged.
 - The whole site (every route except the OAuth routes themselves) requires a valid session — no anonymous tier.
 - A player with no matching `players` record gets a clear 403, not a crash.
-- Local dev bypass for testing mirrors the existing pattern's spirit (a non-production-only test path) — do not weaken it to work in production.
+- Local dev bypass, `NODE_ENV`-allowlisted (`development`/`test` only — NOT a `!== production` denylist, which was the original build's fail-open bug).
+- OAuth `state` CSRF protection (httpOnly cookie, constant-time comparison) — unchanged from the original build's post-review fix.
 
-Source hints: `../TM Suite/server/routes/auth.js`, `../TM Suite/server/middleware/auth.js` (read both fully before implementing — port the pattern, adapt the collection source to the snapshot).
+Source hints: `../TM Suite/server/routes/auth.js`, `../TM Suite/server/middleware/auth.js`, this repo's own `specs/stories/1-3-discord-oauth-reuse.md` Dev Agent Record (documents what was already built and reviewed — don't redo work that only needs the data-source swap).
+
+### Story 1-4: netlify-render-split (new)
+
+**As** Angelus, **I want** this repo deployed the same way TM Suite is — a static frontend on Netlify, an API on Render — **so that** the app actually works in production instead of being a single Express app with no real frontend/backend separation.
+
+**Why this is its own story**: doing this surfaced a real bug in story 1-3's original design — Discord's OAuth redirect is always a browser GET, and the original `DISCORD_REDIRECT_URI` pointed at a POST-only backend route, which could never actually receive it. Fixing the deploy topology and fixing that bug are the same piece of work (the redirect_uri must be a frontend page), so they're one story, not two.
+
+Acceptance criteria:
+- `netlify.toml` at repo root: `publish = "public"`, no build command, a redirect rule proxying `/auth/*` to the Render API (`status = 200, force = true`, matching `../TM Suite/netlify.toml`'s `/api/*` rule shape).
+- `render.yaml` at repo root: a `web` service, `rootDir: server`, `buildCommand: npm ci`, `startCommand: npm start`, env vars for `NODE_ENV`, `MONGODB_URI` (secret), `DISCORD_CLIENT_ID`/`DISCORD_CLIENT_SECRET` (secret), `DISCORD_REDIRECT_URI` (set once the Netlify domain is known — mirrors `../TM Suite/render.yaml`'s `sync: false` pattern for values that depend on the other service's URL).
+- `server/index.js` no longer serves `public/` or any static file — it's an API-only Express app. All CSS/static serving moves entirely to Netlify's remit.
+- `public/login.html` (or equivalent) + client JS: the actual Discord OAuth `redirect_uri` target. On load, checks the URL for `?code=&state=`; if present, POSTs `{code, state}` to `/auth/discord/callback` (proxied through to Render), stores the returned `access_token`/`user` (mirroring `../TM Suite/public/js/auth/discord.js`'s `saveAuth`/`handleCallback` pattern), and redirects to the (still placeholder, until Epic 2) landing page.
+- `DISCORD_REDIRECT_URI` updated to point at this frontend page's Netlify URL, not the backend route.
+- A test proving the fixed flow end-to-end at the HTTP level: hitting `GET /auth/discord` still issues the state cookie and redirects to Discord; a simulated "Discord sent the browser back with `?code=&state=`" load of the login page correctly extracts and POSTs them (this can be a lightweight DOM/fetch-mock test, not a full browser E2E, given the scope).
+- README documents the manual one-time setup: Render Blueprint import, Netlify site import + publish dir, the Discord redirect URI registration (now pointing at the correct frontend URL), and which env vars are secrets vs values.
+
+Source hints: `../TM Suite/netlify.toml`, `../TM Suite/render.yaml`, `../TM Suite/public/js/auth/discord.js`, `../TM Suite/public/js/data/api.js` (API_BASE resolution pattern — localhost in dev, empty string in prod because the proxy makes it same-origin).
 
 ---
 

@@ -1,29 +1,42 @@
-// server/auth.test.js — Story 1.3 (Discord OAuth reuse).
+// server/auth.test.js — Story 1.3 (Discord OAuth reuse; amended by 1.2 rev 2).
 //
-// Discord's token-exchange and /users/@me endpoints are MOCKED via a swapped
-// globalThis.fetch — no automated test ever calls the real Discord API. Player
-// resolution runs against an injected in-memory snapshot (snapshot-store.setSnapshot),
-// so these tests touch no file and no Mongo.
+// Two boundaries are mocked, neither touches anything live:
+//   1. Discord's token-exchange and /users/@me endpoints — MOCKED via a swapped
+//      globalThis.fetch; no automated test ever calls the real Discord API.
+//   2. The `players` Mongo lookup — a fake `Db` injected via db.setTestDb (the
+//      same mongodb-driver-boundary mock Story 1.2 uses), replacing Story 1.3's
+//      original snapshot-store.setSnapshot seam. No file and no live Mongo.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from './index.js';
-import { setSnapshot } from './snapshot-store.js';
+import { setTestDb } from './db.js';
 import { _resetTokenCache } from './middleware/auth.js';
 
 const DISCORD_API = 'https://discord.com/api/v10';
 
-// Injected snapshot: one solo-character player, one multi-character player.
-const TEST_SNAPSHOT = {
-  characters: [],
-  character_dossier: [],
-  territories: [],
-  players: [
-    { discord_id: '111', role: 'player', character_ids: ['charA'], discord_username: 'solo' },
-    { discord_id: '222', role: 'st', character_ids: ['charB', 'charC'], discord_username: 'dual' },
-  ],
-};
-setSnapshot(TEST_SNAPSHOT);
+// Injected players: one solo-character player, one multi-character (dual-role)
+// player. A minimal fake Db returns them from players.find().toArray(); the
+// mongo-store's projection is a superset of these fields, so no stripping is
+// needed for the fixtures to be faithful.
+const TEST_PLAYERS = [
+  { discord_id: '111', role: 'player', character_ids: ['charA'], discord_username: 'solo' },
+  { discord_id: '222', role: 'st', character_ids: ['charB', 'charC'], discord_username: 'dual' },
+];
+
+function fakePlayersDb(players) {
+  return {
+    collection(name) {
+      const docs = name === 'players' ? players : [];
+      return {
+        find() {
+          return { toArray: async () => docs.map((d) => ({ ...d })) };
+        },
+      };
+    },
+  };
+}
+setTestDb(fakePlayersDb(TEST_PLAYERS));
 
 // --- helpers -----------------------------------------------------------------
 
@@ -87,7 +100,7 @@ async function withServer(fn) {
 
 // --- AC #1: redirect ---------------------------------------------------------
 
-test('AC #1: GET /auth/discord redirects to Discord consent with identify scope', async () => {
+test('AC #1: GET /auth/discord redirects to Discord consent with identify scope + issues the state cookie', async () => {
   _resetTokenCache();
   // No fetch mock — this route only redirects; the request hits our own server.
   await withServer(async (base) => {
@@ -98,6 +111,13 @@ test('AC #1: GET /auth/discord redirects to Discord consent with identify scope'
     assert.match(loc, /response_type=code/);
     assert.match(loc, /scope=identify/);
     assert.doesNotMatch(loc, /scope=identify[^&]*(email|guilds)/); // identify only
+    // Story 1.4 AC #6: the CSRF state cookie is still issued (unchanged from 1.3),
+    // and the same state value is carried through Discord's redirect URL.
+    const setCookie = res.headers.get('set-cookie');
+    assert.match(setCookie, /oauth_state=/);
+    assert.match(setCookie, /HttpOnly/i);
+    const stateInUrl = new URL(loc).searchParams.get('state');
+    assert.ok(stateInUrl && stateInUrl.length > 0);
   });
 });
 
@@ -419,38 +439,73 @@ test('AC #6: single-character player uses the identical array path (length 1)', 
   }
 });
 
-// --- SECURITY FIX: static serving is scoped to /css, not the whole public/ dir --
+// --- Follow-up review: async live-Mongo swap — DB-failure path --------------
+// The player lookup is now a LIVE Mongo query (Story 1.2 rev 2), not the old
+// in-memory snapshot .find(). That introduces a failure mode the snapshot never
+// had: the query can REJECT (DB down / timeout / connection reset). Every other
+// external call in these two files is wrapped in try/catch; this one must be too,
+// or the rejection surfaces as a raw Express-default 500 (and, in non-production,
+// a stack-trace-bearing body) instead of the modelled error the ACs call for
+// (AC #4: never a crash). These two tests inject a players collection whose
+// .toArray() rejects, and assert a modelled 503 AUTH_ERROR on both the middleware
+// and the callback resolution paths.
 
-test('SECURITY FIX: ported CSS is still served publicly at /css/*', async () => {
-  await withServer(async (base) => {
-    const theme = await fetch(`${base}/css/theme.css`);
-    const layout = await fetch(`${base}/css/base.css`);
-    assert.equal(theme.status, 200);
-    assert.equal(layout.status, 200);
-  });
-});
+function fakeThrowingDb() {
+  return {
+    collection() {
+      return { find() { return { toArray: async () => { throw new Error('mongo connection reset'); } }; } };
+    },
+  };
+}
 
-test('SECURITY FIX: a request for a bare filename under public/ (not under /css) is never served statically', async () => {
-  // Regression guard for the review finding: express.static(PUBLIC_DIR) used to
-  // expose the WHOLE public/ tree pre-auth. Now only public/css is mounted, at
-  // /css. A path that would have resolved under the old whole-directory mount
-  // (e.g. the unscoped /theme.css) must NOT be served as a static file — it
-  // falls through to the requireAuth gate instead (401, not a leaked file).
-  // Either way nothing under public/ is reachable outside /css without auth.
-  await withServer(async (base) => {
-    const res = await fetch(`${base}/theme.css`); // old (wrong) unscoped path
-    assert.equal(res.status, 401);
-  });
-});
-
-// --- AC #4: home page + OAuth routes stay public -----------------------------
-
-test('AC #4: the login-landing page (/) stays public (Story 1.1 smoke test preserved)', async () => {
+test('Follow-up: middleware DB-lookup rejection is a modelled 503, never a raw 500', async () => {
   _resetTokenCache();
-  await withServer(async (base) => {
-    const res = await fetch(`${base}/`);
-    assert.equal(res.status, 200);
-    const body = await res.text();
-    assert.match(body, /Terra Mortis Wiki/);
-  });
+  const m = mockDiscord({ profile: () => fakeRes(200, { id: '111', username: 'solo' }) });
+  setTestDb(fakeThrowingDb());
+  try {
+    await withServer(async (base) => {
+      const res = await fetch(`${base}/api/me`, {
+        headers: { Authorization: 'Bearer db-outage-token' },
+      });
+      assert.equal(res.status, 503);
+      const body = await res.json();
+      assert.equal(body.error, 'AUTH_ERROR');
+    });
+  } finally {
+    m.restore();
+    setTestDb(fakePlayersDb(TEST_PLAYERS)); // restore the shared fixture db
+  }
 });
+
+test('Follow-up: callback DB-lookup rejection is a modelled 503, never a raw 500', async () => {
+  _resetTokenCache();
+  const m = mockDiscord({
+    token: () => fakeRes(200, { access_token: 'at1', expires_in: 604800 }),
+    profile: () => fakeRes(200, { id: '111', username: 'solo' }),
+  });
+  setTestDb(fakeThrowingDb());
+  try {
+    await withServer(async (base) => {
+      const { state, cookie } = await getState(base);
+      const res = await fetch(`${base}/auth/discord/callback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Cookie: cookie },
+        body: JSON.stringify({ code: 'auth-code', state }),
+      });
+      assert.equal(res.status, 503);
+      const body = await res.json();
+      assert.equal(body.error, 'AUTH_ERROR');
+    });
+  } finally {
+    m.restore();
+    setTestDb(fakePlayersDb(TEST_PLAYERS)); // restore the shared fixture db
+  }
+});
+
+// NOTE (Story 1.4): the two "static serving is scoped to /css" tests and the
+// "login-landing page (/) stays public" test that lived here are RETIRED. This
+// service no longer serves any static files or a home page — CSS and the login
+// page are Netlify's job now (see server/index.js header). Their retirement is
+// intentional, not a regression; Story 1.1/1.3 story files keep the history. The
+// corrected redirect flow is covered by the AC #1 redirect test above plus the
+// login-page callback-handling tests in public/js/auth/login-core.test.js.

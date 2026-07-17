@@ -1,6 +1,6 @@
 # Terra Mortis Wiki
 
-A read-only, player-facing companion site for the Terra Mortis *Vampire: The Requiem 2e* chronicle. It sits alongside `TM Suite` (the ST-facing character management app) and reads from a committed JSON snapshot of the `tm_suite` MongoDB — it never queries or writes to that database at request time.
+A read-only, player-facing companion site for the Terra Mortis *Vampire: The Requiem 2e* chronicle. It sits alongside `TM Suite` (the ST-facing character management app, sibling directory `../TM Suite`) and reads live from the same `tm_suite` MongoDB Atlas database — read-only, on every request. It never writes to `tm_suite`.
 
 See `specs/prd.md`, `specs/architecture.md`, and `specs/epics.md` for the full product and architecture decisions, and `CLAUDE.md` for the repo's hard rules.
 
@@ -14,17 +14,26 @@ See `specs/prd.md`, `specs/architecture.md`, and `specs/epics.md` for the full p
 npm install
 ```
 
-## Run
+## Local development
+
+This is two independently-run halves, exactly like TM Suite:
 
 ```bash
-npm start
+# API (server/) — needs a local .env, see below
+cd server && npm start    # http://localhost:3000
+
+# Static frontend (public/) — separate terminal
+npx http-server public -p 8080   # http://localhost:8080
 ```
 
-Serves the site on `http://localhost:3000` by default. Override the port with the `PORT` environment variable:
+Override the API port with `PORT`: `PORT=4000 npm start`.
 
-```bash
-PORT=4000 npm start
-```
+### `.env` setup
+
+Copy `.env.example` to `.env` in the repo root and fill in:
+
+- `MONGODB_URI` — a **read-only** Atlas connection string (see "Read-only Mongo setup" below).
+- `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` / `DISCORD_REDIRECT_URI` — see "Discord OAuth setup" below.
 
 ## Test
 
@@ -32,98 +41,63 @@ PORT=4000 npm start
 npm test
 ```
 
-Runs the smoke test suite via Node's built-in test runner (`node --test`) — no third-party test framework.
+Runs the full suite via Node's built-in test runner (`node --test`) — no third-party test framework. Tests never touch the live `tm_suite` connection: `server/db.js` exposes `setTestDb` to inject a fake `Db`, and Discord's API is mocked via a swapped `globalThis.fetch`.
 
-## Snapshot (ST-only, manual)
+## Live Mongo connection (no snapshot, no rebuild step)
 
-`data/snapshot.json` is how the deployed site gets its data. It is generated on
-command — never at request time — by reading `tm_suite` read-only, and is
-committed like any other change. The deployed service holds no Mongo connection.
+The deployed API (`server/db.js` + `server/mongo-store.js`) holds a live, read-only connection to `tm_suite` and queries it directly on every request — the same collections TM Suite and the Cockpit read. There is no committed data file and no "regenerate the snapshot" step: a change made in Mongo anywhere is visible here on the next page load.
 
-### Read-only setup (one-time, manual)
+`server/mongo-store.js` is a hard, lexically-tested constraint: it contains no write operations (`updateOne`/`insertOne`/`$out`/`$merge`/etc.) anywhere in its source.
 
-In the MongoDB Atlas console, provision the database user this script connects as
-with a **read-only** role on `tm_suite` (e.g. `read`). The script itself issues
-zero write calls, but Atlas IAM is the real enforcement layer — the client cannot
-enforce read-only from its side. (This mirrors how the Discord redirect URI is
-registered manually in Story 1.3; the guardrail lives outside this codebase.)
+### Read-only Mongo setup (one-time, manual)
 
-### Running it
-
-```bash
-# 1. Put the read-only connection string in a local .env (gitignored — never commit):
-echo 'MONGODB_URI=mongodb+srv://<read-only-user>:<pw>@<cluster>/tm_suite?...' > .env
-
-# 2. Generate the snapshot:
-npm run snapshot        # == node scripts/snapshot.mjs
-```
-
-- **Required env var:** `MONGODB_URI` (read from `.env`). Optional `MONGODB_DB`
-  (defaults to `tm_suite`).
-- **Expected runtime:** seconds, not minutes (~41 characters + a handful of other
-  small collections). If it hangs, connection has failed — see below.
-- **On success** it prints one line and writes `data/snapshot.json`, e.g.:
-
-  ```
-  Snapshot written to .../data/snapshot.json in 1.4s — characters:41 dossiers:31 players:34 territories:20
-  ```
-
-  The output is deterministic: re-running with no underlying Mongo changes
-  produces a byte-identical file, so `git diff data/snapshot.json` shows only
-  real data changes.
-- **On connection failure** (bad/missing URI, network, wrong credentials) it
-  prints `Snapshot failed: <reason>`, exits non-zero, and does **not** write or
-  truncate `data/snapshot.json`. Missing `MONGODB_URI` prints a setup hint and
-  exits non-zero.
-
-After a successful run, review the diff, then commit and push `data/snapshot.json`
-so the deploy picks up the fresh data.
+In the MongoDB Atlas console, provision a database user for this app with a **read-only** role on `tm_suite` (e.g. Atlas's built-in `read` role). The code itself issues zero write calls, but Atlas IAM is the real enforcement layer — the client cannot enforce read-only from its side. Put that user's connection string in `.env` as `MONGODB_URI`.
 
 ## Discord OAuth setup (one-time, manual)
 
-The Wiki reuses TM Suite's **existing Discord application** for login — there is
-no second Discord app to create. You only need to register this repo's redirect
-URI as an additional entry on that same app:
+The Wiki reuses TM Suite's **existing Discord application** for login — there is no second Discord app to create. You only need to register this repo's login page as an additional redirect URI on that same app.
 
-1. Open the [Discord Developer Portal](https://discord.com/developers/applications)
-   and select the **same application TM Suite uses**.
+**Important**: the redirect URI must point at a **frontend page** (`login.html`), never a backend route. Discord's OAuth redirect is always a browser GET with `?code=&state=` in the query string, which can only ever land on a static page — a POST-only JSON route can never receive it. `public/login.html`'s client JS is what reads `code`/`state` from the URL and POSTs them to the API.
+
+1. Open the [Discord Developer Portal](https://discord.com/developers/applications) and select the **same application TM Suite uses**.
 2. Go to **OAuth2 → General → Redirects** and click **Add Another**.
-3. Add this app's callback URL as a new entry alongside TM Suite's existing one
-   (Discord supports multiple redirect URIs natively):
-   - Local: `http://localhost:3000/auth/discord/callback`
-   - Production: `https://<your-wiki-host>/auth/discord/callback`
+3. Add this app's login page URL as a new entry alongside TM Suite's existing one (Discord supports multiple redirect URIs natively):
+   - Local: `http://localhost:8080/login.html`
+   - Production: `https://<your-netlify-site>.netlify.app/login.html`
 4. **Save Changes**.
-5. Copy the application's **Client ID** and **Client Secret** into this repo's
-   local `.env` (gitignored) as `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET`,
-   and set `DISCORD_REDIRECT_URI` to match the entry you registered. See
-   `.env.example`.
+5. Copy the application's **Client ID** and **Client Secret** into this repo's local `.env` (gitignored) as `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET`, and set `DISCORD_REDIRECT_URI` to match the entry you registered. See `.env.example`.
 
-This is a portal-side configuration step only — it is not a code change. The
-`identify` scope (the only scope this app requests) needs no special approval.
+This is a portal-side configuration step only — it is not a code change. The `identify` scope (the only scope this app requests) needs no special approval.
 
-The whole site is behind Discord login: every route except `GET /auth/discord`,
-`POST /auth/discord/callback`, the login landing page (`/`), and the static CSS
-requires a valid Discord session. A request with no/invalid token gets `401`; a
-valid Discord identity with no matching `players` record in the snapshot gets
-`403`. Player resolution reads the committed snapshot, never live Mongo — so a
-player added to TM Suite since the last `npm run snapshot` cannot log in until
-the next snapshot + deploy (a known, accepted trade-off of the rebuild-on-command
-model).
+The whole site is behind Discord login: every route except `GET /auth/discord`, `POST /auth/discord/callback`, and the login page itself requires a valid session. A request with no/invalid token gets `401`; a valid Discord identity with no matching `players` record gets `403`. Player resolution is a live Mongo lookup by `discord_id` — a player added to TM Suite is loginable here immediately, with no rebuild step.
 
 ### Local test bypass
 
-For local development only (never when `NODE_ENV=production`), sending
-`Authorization: Bearer local-test-token` satisfies `requireAuth` without a real
-Discord round-trip, mirroring TM Suite's `local-test-token` pattern.
+For local development only (never when `NODE_ENV=production`), sending `Authorization: Bearer local-test-token` satisfies `requireAuth` without a real Discord round-trip, mirroring TM Suite's `local-test-token` pattern.
+
+## Deployment (Netlify + Render)
+
+Mirrors TM Suite's own split exactly: a static frontend on Netlify, an API on Render, with Netlify proxying `/auth/*` (and later `/api/*`) through to Render so every request is same-origin from the browser's point of view.
+
+**One-time setup, in this order** (the Discord registration needs the Netlify URL to exist first):
+
+1. **Import the Render Blueprint.** In the Render dashboard, "New" → "Blueprint", point it at this repo — it auto-reads `render.yaml` (a single `web` service, `rootDir: server`). Set the secret env vars by hand in the Render dashboard: `MONGODB_URI` (a read-only Atlas user), `DISCORD_CLIENT_SECRET`. `DISCORD_CLIENT_ID` is already set (same public value as TM Suite's). Leave `DISCORD_REDIRECT_URI` and `CORS_ORIGIN` for step 3.
+2. **Import the Netlify site.** Point it at this repo with publish directory `public` — no build command. `netlify.toml`'s redirect rule proxies `/auth/*` to the Render service; update the `to` host in `netlify.toml` if the Render service name differs from `terra-mortis-wiki-api`.
+3. **Register the Discord redirect URI** (see "Discord OAuth setup" above) using the real Netlify URL, then go back and set `DISCORD_REDIRECT_URI` (and `CORS_ORIGIN`, to the Netlify origin) in the Render dashboard.
 
 ## Project layout
 
 ```
-server/            Express app (skeleton; auth + routes arrive in later stories)
-scripts/           on-command Mongo → JSON snapshot script (snapshot.mjs)
-data/              the committed snapshot.json the deployed app reads
-public/css/        design tokens (theme.css) + base layout, ported from TM Suite
-specs/             PRD, architecture, epics, stories
+server/            Express API ONLY (auth, live read-only Mongo reads) — deployed to Render
+  db.js             live Mongo connection
+  mongo-store.js    live accessors (getPlayers, getCharacters, getDossiers, getTerritories, getPlayerByDiscordId)
+  routes/, middleware/
+public/             pure static site — deployed to Netlify
+  css/              design tokens (theme.css) + base layout, ported from TM Suite
+  login.html + js/auth/  the Discord OAuth redirect_uri landing page
+netlify.toml        publish=public, /auth proxy redirect to Render, root serves login.html
+render.yaml         Render Blueprint: web service, rootDir=server, npm ci / npm start
+specs/              PRD, architecture, epics, stories
 ```
 
-Later stories add `content/lore/` (static lore markdown).
+Later stories add `content/lore/` (static lore markdown) and further `public/` pages (character dossiers, world tab) once Epic 2 starts.

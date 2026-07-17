@@ -2,42 +2,49 @@
 
 Decisions below came out of the design roundtable (Winston/Architect leading, with John/PM narrowing scope and Mary/Analyst pressure-testing edge cases) plus Angelus's direct calls. Cite this document, not the roundtable transcript, for implementation.
 
-## Shape
+## Shape (revised — live reads, not a snapshot)
+
+**Superseded design note**: the original plan here was a script Angelus ran on command to snapshot Mongo into a committed JSON file. That's retired — see `specs/prd.md` → "Revision: live reads, not a snapshot" for why. `scripts/snapshot.mjs`, `data/snapshot.json`, and `server/snapshot-store.js` no longer exist in this repo; anything referencing them is historical.
 
 ```
-Snapshot script (run on command,       Wiki repo (this one)
- from the TM Suite dev environment) ─▶  data/snapshot.json  ─▶  Express service ─▶  Player's browser
-        reads tm_suite (Mongo)             (committed)          (Discord OAuth +
-        ONE TIME per run                                         per-viewer projection)
+Browser (Netlify static site)  ──/auth/*, /api/*──▶  Netlify redirect proxy  ──▶  Render (Express API)  ──▶  tm_suite (Mongo, read-only)
+       public/, no build step         (same-origin              (live, read-only              (same database TM Suite
+                                        from the browser's         Mongo connection,             and the Cockpit use)
+                                        point of view)             per request)
 ```
 
-- **Snapshot script**: a Node script, run manually by Angelus (from this dev environment) at the close of a downtime cycle. Connects to `tm_suite` with a **read-only** Mongo Atlas database user, reads the collections below, writes `data/snapshot.json` (or a small set of per-domain JSON files) into this repo. Angelus commits and pushes; the normal Render/Netlify deploy picks up the new snapshot on the next deploy. The deployed service never holds a Mongo connection string.
-- **Wiki service**: a thin Express app. Two jobs only: (1) Discord OAuth login, reusing TM Suite's Discord application and its existing `players` collection; (2) serve per-viewer-projected views computed from the snapshot loaded into memory at boot. No database driver in the deployed process.
-- **No live query, ever, in v1 or v2.** This was a deliberate, explicit call (Angelus, over the PM's initial push for it): rebuild-on-command is the freshness model, not per-request Mongo reads.
+This is the exact two-service split TM Suite itself uses (`../TM Suite/netlify.toml` + `../TM Suite/render.yaml`), not a new pattern:
 
-## Auth — port, don't reinvent
+- **Netlify serves `public/` as a pure static site.** No build command, no server-rendered pages — plain HTML/CSS/JS. `netlify.toml`'s redirect rules proxy `/auth/*` (and later `/api/*`) through to the Render API with `status = 200, force = true`, so from the browser's perspective every request is same-origin against the Netlify domain, even though Render is actually serving it behind the scenes. This is also why CORS barely matters in production — it only matters for local dev, where the frontend and API run on different ports.
+- **Render runs the Express API** (`server/`) — the ONLY thing in this whole system that touches Mongo, and only ever read-only. It holds a live `MONGODB_URI` (a dedicated read-only Atlas database user — a manual Atlas-console step, not something either app enforces at the client level) and queries `tm_suite` directly on each request. No committed snapshot, no rebuild ritual — a change in Mongo is visible on the next page load, everywhere (TM Suite, the Cockpit, and this Wiki all read the same live collections).
+- **The API never serves static files.** `public/`'s CSS and any future frontend assets are Netlify's job entirely; Render's Express app only exposes JSON/auth routes.
+
+## Auth — port, don't reinvent, and fix the redirect_uri bug from the first pass
 
 TM Suite's existing pattern (`../TM Suite/server/routes/auth.js` + `../TM Suite/server/middleware/auth.js`) is:
 
 1. `GET /api/auth/discord` redirects to Discord's OAuth2 consent screen (`identify` scope only).
-2. `POST /api/auth/discord/callback` exchanges the code for a Discord access token, fetches the Discord profile, looks up (or auto-links by username) a matching doc in the `players` collection by `discord_id`, and returns the Discord `access_token` plus a `user` object (`role`, `player_id`, `character_ids`, `is_dual_role`).
-3. The frontend holds that Discord `access_token` (not a wiki-issued JWT) and sends it as `Authorization: Bearer <token>` on every subsequent request.
-4. `requireAuth` middleware validates the bearer token against Discord's `/users/@me` on each request (cached 60s per token, in-memory `Map`), re-derives `req.user` from the `players` collection lookup.
+2. Discord redirects the user's **browser** back to a `redirect_uri` — critically, **a frontend page** (TM Suite uses `/admin`), via a plain GET with `?code=&state=` in the query string. This is not optional: Discord's redirect is always a browser navigation, never a fetch/POST, so the redirect_uri can never be a POST-only JSON route.
+3. The frontend page's JS reads `code` (and `state`, once CSRF protection is added — see below) from the URL and POSTs it to the API's `/api/auth/discord/callback`, which exchanges the code for a Discord access token, fetches the Discord profile, looks up a matching `players` document by `discord_id` (live Mongo query), and returns the Discord `access_token` plus a `user` object.
+4. The frontend holds that Discord `access_token` (not a wiki-issued JWT) and sends it as `Authorization: Bearer <token>` on every subsequent request.
+5. `requireAuth` middleware validates the bearer token against Discord's `/users/@me` on each request (cached 60s per token, in-memory `Map`), re-derives `req.user` from a live `players` lookup.
 
-**Port this near-verbatim into the wiki's Express service.** Same Discord app (register the wiki's redirect URI as a second entry on the same Discord application — Discord supports multiple redirect URIs natively), same `players` collection shape read from the snapshot (not live Mongo). Do not invent a separate session/JWT scheme — the existing pattern is what "same authorisation as TM Suite" means concretely.
+**The first implementation pass of this got step 2 wrong** — `DISCORD_REDIRECT_URI` was pointed directly at the backend's POST-only callback route, which Discord's GET redirect could never actually hit in a real browser. Fixed shape: `DISCORD_REDIRECT_URI` points at a frontend page served by Netlify (`public/login.html` or similar), which does the code-extraction-and-POST handoff, exactly like TM Suite's `/admin` does today (see `../TM Suite/public/js/auth/discord.js` for the exact client-side pattern to port: `login()`, `handleCallback()`, token storage).
+
+Player resolution (`getPlayerByDiscordId`) is a live `db.collection('players').findOne({ discord_id })` — not a snapshot lookup. This is actually closer to a straight port of TM Suite's real `auth.js`/`middleware/auth.js` than the snapshot-detour the first pass built.
 
 `players.character_ids` is already an array — multi-character-per-player is already representable even though every player has exactly one today. Do not special-case "one character" anywhere in the ownership logic.
 
-The whole site sits behind this login. There is no anonymous/public tier in v1 (Angelus's explicit call).
+The whole site sits behind this login. There is no anonymous/public tier in v1 (Angelus's explicit call) — except the login page itself and the OAuth routes, which necessarily can't require a session to reach.
 
 ## Data model
 
-### Snapshot contents
+### Live reads
 
-The snapshot script reads (read-only) from `tm_suite`:
+The API reads (read-only, per request, no caching layer beyond the auth token cache) from `tm_suite`:
 - `characters` — full documents, all 41 (including retired).
-- `character_dossier` — the existing fact-extraction collection (`facts[]`, see `../TM Suite/server/schemas/character_dossier.schema.js` for the shape already in production — `tag`/`value`/`source`/`st_hidden`/etc.).
-- `players` — for the `discord_id` ↔ `character_ids` mapping the auth layer needs. **Only the fields needed for auth** (`discord_id`, `role`, `character_ids`, `discord_username`) go into the snapshot — nothing else from this collection is player-facing.
+- `character_dossier` — the existing fact-extraction collection (`facts[]`, see `../TM Suite/server/schemas/character_dossier.schema.js` for the shape already in production — `tag`/`value`/`source`/`st_hidden`/`revealed_to`/etc.).
+- `players` — for the `discord_id` ↔ `character_ids` mapping the auth layer needs. The API projects to **only the auth-relevant fields** (`discord_id`, `role`, `character_ids`, `discord_username`) when building `req.user` — nothing else from this collection is ever player-facing, same privacy boundary as before, just enforced at query/projection time instead of snapshot-build time.
 - `territories` — for `regent_id` / `lieutenant_id` (World tab office data).
 - Lore content (primer/game guide/rules/friendly errata) — see "Lore content" below for where this actually lives.
 
@@ -54,13 +61,7 @@ Everything else on the character document (attributes, skills, disciplines, meri
 
 ### Reveals — extend the existing fact schema, don't fork a new one
 
-`character_dossier.schema.js` already has `st_hidden: boolean` per fact — a binary "ST-only vs public" flag. Add one field to the same fact shape rather than introducing a parallel collection:
-
-```js
-revealed_to: { type: ['array', 'null'], items: { type: 'string' } } // character _ids this fact has been explicitly shown to, despite st_hidden
-```
-
-A fact with `st_hidden: true` and `revealed_to: ['<Rene's character _id>']` is visible in Rene's view of that character's summary, and no one else's. This is authored by Angelus via an ad hoc script from the TM Suite dev environment (there is no admin UI for this in v1 or v2) — the schema is the only guardrail, so:
+`../TM Suite/server/schemas/character_dossier.schema.js` (the real, live-enforced source of truth — not a copy in this repo) now has `revealed_to: { type: ['array', 'null'], items: { type: 'string' } }` alongside `st_hidden`. A fact with `st_hidden: true` and `revealed_to: ['<Rene's character _id>']` is visible in Rene's view of that character's summary, live, on the next request after the fact is written — and no one else's. This is authored by Angelus via an ad hoc script from the TM Suite dev environment (there is no admin UI for this in v1 or v2), writing directly into the live `tm_suite.character_dossier` collection:
 - `revealed_to`, when present, must be an array of valid `characters._id` values — the authoring script should verify referential integrity before writing (target character exists, every id in `revealed_to` exists) since nothing else will catch a typo.
 - This field is **out of scope to build UI for** in v1. The schema supports it from day one; nothing in this app's routes needs to expose a way to *set* it.
 
@@ -78,16 +79,19 @@ Never committed, never served. `assets/portraits/` (if it exists locally at all,
 
 Port (not fork) the design tokens and components actually needed from `../TM Suite/public/css/theme.css` and `../TM Suite/public/css/components.css` — `:root` custom properties (colours, fonts, spacing), the parchment/gold-accent palette, Cinzel/Lora font stack, and any card/grid/chip component classes that fit this site's needs (e.g. `.char-card`, `.char-grid`, `.char-chip` equivalents). Follow the same rule TM Suite enforces on itself: no bare hex, no inline `style="..."`, reuse or extend a token/class, never invent a one-off.
 
-## Directory layout (this repo)
+## Directory layout (this repo, revised)
 
 ```
-server/            Express app: auth (ported), routes, view rendering
-scripts/           snapshot.mjs (the on-command Mongo → JSON script)
-data/              snapshot.json (committed, regenerated on command)
-content/lore/      static lore markdown (primer, game guide, rules, friendly errata)
-public/css/        ported design tokens/components from TM Suite
-views/ or public/   rendered character/world/lore pages
-specs/              this PRD, this architecture doc, epics.md, stories/
+server/            Express API ONLY (auth, live Mongo reads) — deployed to Render, rootDir: server
+  db.js             live Mongo connection (mirrors ../TM Suite/server/db.js)
+  routes/, middleware/
+public/             pure static site — deployed to Netlify, publish dir: public
+  css/               ported design tokens/components from TM Suite
+  login.html + js    the OAuth redirect_uri landing page (code/state extraction, POSTs to the API)
+content/lore/       static lore markdown (primer, game guide, rules, friendly errata) — served by the API or read by the frontend at build/serve time (decided per-story)
+netlify.toml        publish=public, /auth (and later /api) proxy redirects to Render
+render.yaml         Render Blueprint: web service, rootDir=server, npm ci / npm start
+specs/              this PRD, this architecture doc, epics.md, stories/, deferred-work.md
 ```
 
-Exact framework choices for templating (server-rendered HTML vs a lightweight client render) are left to the story 1-1 implementation — match whatever is simplest given Express + the ported CSS, no new frontend framework needed for this scope.
+`server/` and `public/` are two independently deployed halves of one repo — exactly TM Suite's own layout, not a new pattern. Neither app serves the other's files: Render's Express app never calls `express.static`, and Netlify never runs Node.

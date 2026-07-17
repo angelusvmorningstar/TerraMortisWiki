@@ -2,6 +2,10 @@
 
 Status: done
 
+## Amendment (post-review of the wider architecture)
+
+Angelus reconsidered the snapshot-based data model after this story originally shipped (see `specs/prd.md` → "Revision: live reads, not a snapshot"). The ONLY thing that changes here: `getPlayerByDiscordId` (and the middleware/route calls to it) now go through story 1-2's live `server/mongo-store.js` instead of the retired `server/snapshot-store.js`, and become `async`/`await`ed accordingly. Everything below this note describes the ORIGINAL build and its review — it is accurate history, not to be rewritten — except that every mention of "the snapshot" for player resolution should be read as "the live `mongo-store` module" going forward. The CSRF `state` fix, the `NODE_ENV` allowlist fix, and the narrowed-static-serving fix documented below are unaffected and must not regress.
+
 ## Story
 
 As a player,
@@ -20,24 +24,24 @@ so that I don't need a second login and the site knows which character(s) are mi
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Env config (AC: #1, #7)
-  - [ ] Extend this repo's env loading with `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_REDIRECT_URI` (mirror `../TM Suite/server/config.js`'s shape/defaults where sensible)
-  - [ ] `.env.example` documents the required vars without real values
-- [ ] Task 2: Auth routes (AC: #1, #2)
-  - [ ] `server/routes/auth.js`: `GET /auth/discord` (redirect), `POST /auth/discord/callback` (code exchange + profile fetch + `players` lookup against the loaded snapshot)
-  - [ ] Snapshot's `players` array is loaded into memory once at boot (reuse whatever snapshot-loading approach makes sense here — this repo doesn't have a "load the snapshot" utility yet; write a small one, since story 2-1/2-2 will need to load the rest of the snapshot too)
-- [ ] Task 3: Auth middleware (AC: #3, #4, #5, #6)
-  - [ ] `server/middleware/auth.js`: `requireAuth`, matching TM Suite's cache-then-validate shape, resolving against the in-memory snapshot's `players`
-  - [ ] Apply `requireAuth` to every route except the two auth routes
-  - [ ] Local test bypass, `NODE_ENV`-gated
-- [ ] Task 4: Error responses (AC: #4)
-  - [ ] 401 for missing/invalid/expired bearer token
-  - [ ] 403 for a valid Discord identity with no matching `players` record
-- [ ] Task 5: Tests
-  - [ ] Mock Discord's token-exchange and `/users/@me` endpoints (do not call the real Discord API in tests) — verify: successful login resolves the right player, unknown Discord ID gets 403, missing/invalid bearer gets 401, a gated route is unreachable without auth, the local test bypass never activates when `NODE_ENV=production`
-  - [ ] A test asserting `character_ids` handling doesn't special-case array length 1
-- [ ] Task 6: Document the manual Discord setup step (AC: #1)
-  - [ ] README: exact instructions for registering this repo's redirect URI as a second entry on the existing TM Suite Discord application
+- [x] Task 1: Env config (AC: #1, #7)
+  - [x] Extend this repo's env loading with `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_REDIRECT_URI` (mirror `../TM Suite/server/config.js`'s shape/defaults where sensible)
+  - [x] `.env.example` documents the required vars without real values
+- [x] Task 2: Auth routes (AC: #1, #2)
+  - [x] `server/routes/auth.js`: `GET /auth/discord` (redirect), `POST /auth/discord/callback` (code exchange + profile fetch + `players` lookup) — amended to resolve via the live `server/mongo-store.js` (Story 1.2 rev 2) rather than the retired snapshot store
+  - [x] Player resolution goes through the shared `getPlayerByDiscordId` accessor (now `async`, awaited); no boot-time snapshot load is needed under the live-read model
+- [x] Task 3: Auth middleware (AC: #3, #4, #5, #6)
+  - [x] `server/middleware/auth.js`: `requireAuth`, matching TM Suite's cache-then-validate shape, resolving against the live `players` lookup (`await getPlayerByDiscordId`)
+  - [x] Apply `requireAuth` to every route except the two auth routes
+  - [x] Local test bypass, `NODE_ENV`-gated (fail-closed allowlist per review)
+- [x] Task 4: Error responses (AC: #4)
+  - [x] 401 for missing/invalid/expired bearer token
+  - [x] 403 for a valid Discord identity with no matching `players` record
+- [x] Task 5: Tests
+  - [x] Mock Discord's token-exchange and `/users/@me` endpoints (do not call the real Discord API in tests) — verify: successful login resolves the right player, unknown Discord ID gets 403, missing/invalid bearer gets 401, a gated route is unreachable without auth, the local test bypass never activates when `NODE_ENV=production`; player fixtures now injected via `db.setTestDb` (mongodb-driver mock) instead of the retired `setSnapshot` seam
+  - [x] A test asserting `character_ids` handling doesn't special-case array length 1
+- [x] Task 6: Document the manual Discord setup step (AC: #1)
+  - [x] README: exact instructions for registering this repo's redirect URI as a second entry on the existing TM Suite Discord application
 
 ## Dev Notes
 
@@ -80,6 +84,12 @@ Opus 4.8 (dev-story / Amelia).
 - **AC #7:** `DISCORD_CLIENT_SECRET` is read in `config.js` and used only in the server-to-server token-exchange body; grep confirms no `console.*` of secrets/tokens and it never enters a response or the snapshot.
 - **Test results:** `npm test` → 28 pass / 0 fail. Includes the 10 pre-existing tests (9 in `scripts/snapshot.test.js`, 1 in `server/index.test.js`) unchanged.
 
+- **Amendment verification pass (2026-07-17).** Re-verified the live-Mongo swap required by the Amendment note at the top of this file. Findings:
+  - The amendment code was already in place from the sibling Story 1.2 work: both `server/routes/auth.js` and `server/middleware/auth.js` import `getPlayerByDiscordId` from `../mongo-store.js` (not the deleted `snapshot-store.js`) and `await` it. No dangling import of the deleted `snapshot-store.js` exists anywhere in the repo (grep confirms only historical mentions in comments and archived story files remain).
+  - Fixed one stale comment: `server/routes/auth.js` line ~64 read "resolve the matching snapshot player" and now reads "resolve the matching player via the live mongo-store lookup". No other stale player-resolution wording found in the live code paths.
+  - Re-verified all 7 original ACs and all 6 post-review security patches hold under the async live-Mongo swap: CSRF `state` round-trip (routes/auth.js), fail-closed `{development, test}` allowlist bypass gate (middleware/auth.js), narrowed static serving (now fully retired to Netlify by Story 1.4, not regressed), try/catch on both callback Discord fetches, server-pinned `redirect_uri`, and string-normalised id comparison (carried forward into `mongo-store.js` `getPlayerByDiscordId`).
+  - No code was broken by the swap; no TDD fix was needed beyond the comment. `npm test` → 36 pass / 0 fail (the auth suite plus the mongo-store and login-core suites now in the repo).
+
 ### File List
 
 Created:
@@ -107,6 +117,26 @@ Modified again, post-review (see Senior Developer Review below):
 
 - `server/config.js`, `server/snapshot-store.js`, `server/routes/auth.js`, `server/middleware/auth.js`, `server/auth.test.js`, `server/snapshot-store.test.js`, `.env.example`, `server/index.js`, `README.md`, `package.json`, `package-lock.json`
 
+### File List (amendment verification pass, 2026-07-17)
+
+Modified:
+- `server/routes/auth.js` — corrected one stale comment ("snapshot player" -> "the live mongo-store lookup"); no functional change
+
+Verified-only (live-Mongo swap already implemented by Story 1.2's replacement, no edit needed this pass):
+- `server/routes/auth.js`, `server/middleware/auth.js` — import + `await` `getPlayerByDiscordId` from `server/mongo-store.js`
+- `server/mongo-store.js` — async live-read `getPlayerByDiscordId` (string-normalised comparison carried forward)
+- `server/auth.test.js` — player fixtures injected via `db.setTestDb` mongodb mock (replaces retired `setSnapshot` seam)
+
+### File List (follow-up review, async live-mongo-store amendment, 2026-07-17)
+
+Modified:
+- `server/middleware/auth.js` — wrapped the live `getPlayerByDiscordId` lookup in try/catch → modelled `503 AUTH_ERROR` on a Mongo rejection (finding F1)
+- `server/routes/auth.js` — same try/catch wrap on the callback's `getPlayerByDiscordId` lookup (finding F1)
+- `server/auth.test.js` — 2 new discrimination tests: middleware and callback DB-lookup rejection each return 503, not a raw 500
+
+Verified-only (no regression, no edit needed):
+- `server/mongo-store.js` — async live-read `getPlayerByDiscordId` unchanged; no bug found in the store itself
+
 ## Senior Developer Review
 
 **3-layer adversarial review** (Blind Hunter: code only · Edge Case Hunter: code + project conventions · Acceptance Auditor: code + this story's ACs), all Opus, run independently and in parallel. This is an authentication layer, so findings were weighted toward anything that could grant unauthorised access.
@@ -129,3 +159,25 @@ Modified again, post-review (see Senior Developer Review below):
 Six patches applied for real security findings, all re-verified: full suite re-run after every patch stayed green, and a live boot (`node server/index.js`) confirmed `/`, `/css/theme.css`, and `/auth/discord`'s redirect all still work correctly post-patch. One test I added on top of the fix (asserting the OAuth state cookie is single-use) was itself wrong — `res.clearCookie()` is client-side hygiene, not a server-side nonce store, and enforcing true single-use isn't required by the actual CSRF threat model (an attacker without the victim's cookie can't forge a match regardless; Discord's own authorization code is already single-use). That test was removed rather than adding unneeded server-side state-tracking machinery to satisfy it. Final suite: 34/34 passing.
 
 **No unresolved High/Medium findings remain. Status: done.**
+
+### Follow-up review: async live-mongo-store amendment (2026-07-17)
+
+**Focused adversarial re-review** of ONLY what the Amendment changed: swapping `getPlayerByDiscordId` (and its route/middleware callers) from the retired in-memory snapshot store to Story 1.2's live, async `server/mongo-store.js`. Not a redo of the original six-finding review — the six patches were re-verified intact, not re-audited from scratch. Same three lenses (Blind Hunter / Edge Case Hunter / Acceptance Auditor), weighted toward anything the async/live-Mongo change could have introduced.
+
+**Lens sweep (what did NOT regress):**
+
+- **Cache-hit latency (AC #3) — PASS.** `requireAuth`'s 60s in-memory token cache still short-circuits: both the cache hit and the dev bypass `return next()` *before* the `await getPlayerByDiscordId` call, so a cached request never awaits a live Mongo round-trip. The existing "hits Discord only once (cached)" test corroborates.
+- **The six original patches — PASS, none depend on synchronous behaviour the swap broke.** State-CSRF verification, the fail-closed `{development, test}` bypass gate, the server-pinned `redirect_uri`, both Discord-fetch try/catch blocks, and the string-normalised id comparison all sit before or independent of the new await; `res.clearCookie` is synchronous. The string-normalise fix was correctly carried forward into `mongo-store.js` `getPlayerByDiscordId` (`String(...)` both sides).
+- **Unhandled-rejection process crash/hang — PASS (Express 5).** Express 5 auto-forwards a rejected async handler/middleware promise to its error handler, so the swap does not produce a Node `UnhandledPromiseRejection` hang (the failure the equivalent Express-4 code would have). It does, however, forward to the *default* handler — see the finding below.
+
+**Findings triage:**
+
+| # | Finding | Lens(es) | Severity | Disposition |
+|---|---|---|---|---|
+| F1 | **Live-Mongo player lookup rejection surfaces as a raw 500, not a modelled error.** The new `await getPlayerByDiscordId()` in BOTH `routes/auth.js` (callback) and `middleware/auth.js` (`requireAuth`) was not wrapped in try/catch. Every other external call in these two files is guarded (both Discord fetches in the route — the original review's finding #4; the Discord fetch in the middleware). A live Mongo rejection (DB down / timeout / connection reset) — a failure mode the retired in-memory snapshot `.find()` could never have — propagates to Express 5's default error handler as HTTP 500 (and, in non-production, a stack-trace-bearing body). Same class the original finding #4 patched for Discord. | Blind Hunter, Edge Case Hunter | MEDIUM | **Patched** — both call sites wrapped; a Mongo rejection now returns a modelled `503 AUTH_ERROR`. 503 (not 401) deliberately: the token WAS validated, so this is a server-side dependency failure and must not tell a legitimately-authenticated client its token is invalid (which would make the frontend discard a good session on a transient blip). It still fails closed: no `req.user` is set, `next()` is never called, nothing is cached. Two discrimination tests added (middleware path + callback path): both FAIL against the unpatched code with `500 !== 503`, PASS after the wrap. |
+
+No other findings. No new deferrals. The original review's two deferred items (#7 unbounded token-cache growth, #8 snapshot accessors return live references — now moot, `mongo-store.js` returns fresh docs per query and `getPlayerByDiscordId` maps copies) are unaffected by this pass.
+
+**Final suite: 40/40 passing** (38 pre-existing + the 2 new DB-failure discrimination tests). No regressions.
+
+**No unresolved High/Medium findings remain (original review or this follow-up). Status: done.**

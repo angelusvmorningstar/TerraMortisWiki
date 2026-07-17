@@ -9,7 +9,6 @@
   },
   "scripts": {
     "start": "node server/index.js",
-    "snapshot": "node scripts/snapshot.mjs",
     "test": "node --test"
   },
   "dependencies": {
