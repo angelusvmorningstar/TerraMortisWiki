@@ -122,10 +122,12 @@ function sortNameKey(character) {
 
 const router = express.Router();
 
-// GET /api/characters — the full roster (active AND retired), read live from
-// Mongo (no hardcoded count). Each entry is built through the SAME allowlist
-// path as the summary tier — NEVER a raw character-doc spread — so no owner-only
-// field can appear on any entry for any viewer. Sorted by sortName.
+// GET /api/characters — the active roster, read live from Mongo (no hardcoded
+// count). Retired characters are excluded (Angelus's call, 2026-07-17 —
+// supersedes this story's original AC #9, which showed them muted rather than
+// hidden). Each entry is built through the SAME allowlist path as the summary
+// tier — NEVER a raw character-doc spread — so no owner-only field can appear
+// on any entry for any viewer. Sorted by sortName.
 router.get('/characters', async (req, res) => {
   let characters;
   try {
@@ -134,6 +136,7 @@ router.get('/characters', async (req, res) => {
     return res.status(503).json({ error: 'STORE_ERROR', message: 'Character data temporarily unavailable' });
   }
   const list = characters
+    .filter((c) => !c.retired)
     .map(summariseCharacter)
     .sort((a, b) => sortNameKey(a).localeCompare(sortNameKey(b)));
   res.json({ characters: list });

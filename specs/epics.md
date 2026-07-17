@@ -111,3 +111,35 @@ Acceptance criteria:
 ## Sequencing
 
 Epic 1 must complete before Epic 2 starts (2-1 needs the snapshot's auth-relevant fields and the auth middleware from 1-2/1-3; 2-2 and 2-3 need the snapshot from 1-2). Within Epic 2, 2-1/2-2/2-3 have no ordering dependency on each other.
+
+---
+
+## Epic 3 - World &amp; Status Parity
+
+**Objective**: bring the player-facing world and roster surfaces up to the presentation and access parity TM Suite already has. Epic 2 shipped the pages; Epic 3 reshapes how they read (a scannable court/regency/roster layout) and adds the per-viewer status ladder that mirrors TM Suite's covenant/clan status gating. This is genuinely new scope beyond the original v1 plan, not part of Epic 1 or Epic 2.
+
+### Story 3-1: world-status-layout
+
+**As** a player, **I want** the Court page to present the court, the regencies, and the full active roster as three collapsible sections, with each person's covenant, clan, and any office they hold visible at a glance, **so that** I can find who holds power and who belongs to which faction without scrolling through flat, undifferentiated lists.
+
+Acceptance criteria:
+- Frontend-only rework of the existing Court page (`public/court.html` + `public/js/world/court.js` + tokens-only `public/css/components.css` additions). No new endpoint; `GET /api/world` and `GET /api/characters` are consumed exactly as they already exist, and no server file or schema changes.
+- Three collapsible sections built with native `<details>` / `<summary>` (keyboard-accessible for free), in order: **Court** (one row per office-title holder, title as a red pill badge), **Regencies** (one row per territory showing its Regent only, badge = territory name; Lieutenants excluded as a territorial role, not a personal title), **Who's Who** (the full active roster grouped by covenant, each row showing name + clan text + covenant icon, plus an office-title badge if that character also holds a title).
+- Which characters hold a title is derived client-side by joining `/api/world`'s `titleGroups` holders against the `/api/characters` roster by `_id` (both sides String-normalised): pure frontend assembly over already-allowlist-projected payloads, so no new leak surface and nothing new to gate.
+- Built to the approved design-lock mockup (`specs/mockups/3-1-world-status-layout/mockup.html`), whose locked decisions are authoritative: no player-name field, clan as plain text not an icon, Regencies = Regents only. Covenant crests reuse the ported `.char-card__icon--<slug>` mask assets and the existing covenant slug map; clan-icon porting stays parked. British English, no em-dashes.
+
+Out of scope for 3-1: the status ladder (Story 3-2), clan icons as SVG assets, and any change to `/api/world` / `/api/characters` / the World map page.
+
+### Story 3-2: covenant-clan-status-ladder (backlog)
+
+**As** a player, **I want** to see the covenant and clan status ladder for my own covenant and clan, **so that** I understand where I and my faction-mates stand without seeing the internal standing of factions I do not belong to.
+
+Acceptance criteria (seed):
+- A per-viewer status ladder for covenant(s) and clan, gated so a non-ST viewer sees ONLY the ladder for the covenant(s)/clan their OWN character belongs to, mirroring TM Suite's `covenantListFor` / `clanRowsFor` gating exactly. This is genuinely new per-viewer access-control/projection logic (unlike Story 3-1, which is pure presentation over already-safe data), so the projection boundary is server-side and leak-tested in the same manner as Story 2-1.
+- Deferred and separately scoped; not built as part of Story 3-1.
+
+---
+
+## Sequencing (Epic 3)
+
+Story 3-1 has no dependency beyond Epic 1's auth gate and Epic 2's `/api/world` + `/api/characters` endpoints, both of which are done. Story 3-2 (the status ladder) is independent of 3-1 and carries the per-viewer gating that 3-1 deliberately excludes.

@@ -7,6 +7,7 @@
 
 import { apiGet } from '../data/api.js';
 import { displayName, esc, portraitInitial } from '../data/display.js';
+import { COVENANT_ICON_SLUG } from '../data/covenant-icons.js';
 
 const grid = document.getElementById('grid');
 const count = document.getElementById('count');
@@ -18,25 +19,27 @@ function showStatus(message, isError) {
   status.classList.toggle('hero__status--error', !!isError);
 }
 
-// Faction chips: clan, covenant, bloodline — each only if present (honest gap).
-function chips(c) {
-  const out = [];
-  if (c.clan) out.push(`<span class="chip">${esc(c.clan)}</span>`);
-  if (c.covenant) out.push(`<span class="chip chip--cov">${esc(c.covenant)}</span>`);
-  if (c.bloodline) out.push(`<span class="chip">${esc(c.bloodline)}</span>`);
-  if (c.retired) out.push('<span class="chip chip--retired">Retired</span>');
-  return out.join('');
+// Covenant-name -> icon-slug map is shared with the Court page; see
+// ../data/covenant-icons.js. A character with no covenant on file (or an
+// unrecognised one) falls back to the letter-monogram portrait rather than a
+// broken icon — an honest gap, not a guess.
+
+// The crest: covenant icon when recognised, otherwise the letter-monogram
+// portrait so the card is never left blank.
+function crestHtml(c) {
+  const slug = c.covenant && COVENANT_ICON_SLUG[c.covenant];
+  if (slug) {
+    return `<span class="char-card__icon char-card__icon--${slug}" aria-hidden="true" title="${esc(c.covenant)}"></span>`;
+  }
+  return `<span class="portrait" aria-hidden="true">${esc(portraitInitial(c))}</span>`;
 }
 
 function cardHtml(c) {
   const retiredClass = c.retired ? ' char-card--retired' : '';
   return `
     <a class="char-card${retiredClass}" href="/character.html?id=${encodeURIComponent(c._id)}">
-      <span class="portrait" aria-hidden="true">${esc(portraitInitial(c))}</span>
-      <span class="char-card__body">
-        <span class="char-card__name">${esc(displayName(c))}</span>
-        <span class="char-card__meta">${chips(c)}</span>
-      </span>
+      ${crestHtml(c)}
+      <span class="char-card__name">${esc(displayName(c))}</span>
     </a>`;
 }
 

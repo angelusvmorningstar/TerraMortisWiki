@@ -17,10 +17,11 @@
     <h1 class="hero__title">Wiki</h1>
     <p class="hero__lede" id="lede">Sign in with the same Discord account you use for TM Suite.</p>
     <p class="hero__status" id="status" hidden></p>
-    <a class="btn" id="login-btn" href="/auth/discord" hidden>Log in with Discord</a>
+    <a class="btn" id="login-btn" href="#" hidden>Log in with Discord</a>
     <nav id="post-login-nav" hidden>
       <a class="backlink" href="/characters.html">Characters &rarr;</a>
-      <a class="backlink" href="/world.html">World and Court &rarr;</a>
+      <a class="backlink" href="/world.html">World &rarr;</a>
+      <a class="backlink" href="/court.html">Court &rarr;</a>
       <a class="backlink" href="/lore.html">Lore &rarr;</a>
     </nav>
   </div>
@@ -39,6 +40,8 @@
   const loginBtn = document.getElementById('login-btn');
   const postLoginNav = document.getElementById('post-login-nav');
 
+  loginBtn.href = `${API_BASE}/auth/discord`;
+
   function showStatus(message, isError) {
     status.textContent = message;
     status.hidden = false;
@@ -56,7 +59,7 @@
     const req = buildCallbackRequest(code, state);
     let res;
     try {
-      res = await fetch(`${API_BASE}${req.path}`, { method: req.method, headers: req.headers, body: req.body });
+      res = await fetch(`${API_BASE}${req.path}`, { method: req.method, headers: req.headers, body: req.body, credentials: 'include' });
     } catch {
       showStatus('Could not reach the server. Check your connection and try again.', true);
       loginBtn.hidden = false;

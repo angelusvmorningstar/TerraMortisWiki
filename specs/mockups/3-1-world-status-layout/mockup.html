@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup: World Status Layout (story 3-1)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@400;700&family=Lato:wght@400;600;700;900&family=Libre+Baskerville:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../public/css/theme.css">
+<link rel="stylesheet" href="../../../public/css/base.css">
+<link rel="stylesheet" href="../../../public/css/components.css">
+<style>
+  /* ── Mockup-only additions for story 3-1. Not production CSS yet — folded
+     into components.css once locked. Tokens-only, matching house style. ── */
+
+  .roster-section {
+    background: var(--surf);
+    border: 1px solid var(--bdr2);
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+  }
+
+  .roster-section__head {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.9rem 1.1rem;
+    cursor: pointer;
+    list-style: none;
+    font-family: var(--fh);
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--txt);
+  }
+
+  .roster-section__head::-webkit-details-marker { display: none; }
+
+  .roster-section__chevron {
+    width: 0.7rem;
+    height: 0.7rem;
+    border-right: 2px solid var(--txt3);
+    border-bottom: 2px solid var(--txt3);
+    transform: rotate(-45deg);
+    transition: transform 0.15s;
+    flex-shrink: 0;
+  }
+
+  .roster-section[open] > .roster-section__head > .roster-section__chevron {
+    transform: rotate(45deg);
+  }
+
+  .roster-section__count {
+    font-family: var(--fl);
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--txt3);
+    background: var(--surf2);
+    border: 1px solid var(--bdr);
+    border-radius: 10px;
+    padding: 0.05rem 0.5rem;
+  }
+
+  .roster-section__body {
+    border-top: 1px solid var(--bdr2);
+  }
+
+  /* Covenant sub-group inside Who's Who — its own bar, not a nested accordion. */
+  .roster-group__head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 1.1rem;
+    background: var(--surf2);
+    border-bottom: 1px solid var(--bdr);
+    font-family: var(--fh);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .roster-group__icon {
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    background-color: var(--accent);
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+  }
+
+  .roster-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.65rem 1.1rem;
+    border-bottom: 1px solid var(--bdr);
+    text-decoration: none;
+    transition: background 0.12s;
+  }
+
+  a.roster-row:hover { background: var(--surf2); }
+  .roster-row:last-child { border-bottom: none; }
+
+  .roster-row__name {
+    font-family: var(--fh);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--gold2);
+  }
+
+  .roster-row__badges {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-shrink: 0;
+  }
+
+  .roster-badge {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--fl);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--txt-on-dark, #fff);
+    background: var(--crim);
+    border-radius: 10px;
+    padding: 0.15rem 0.55rem;
+    white-space: nowrap;
+  }
+
+  .roster-clan {
+    font-family: var(--fl);
+    font-size: 0.72rem;
+    font-variant: small-caps;
+    color: var(--txt2);
+    white-space: nowrap;
+  }
+
+  .roster-cov-icon {
+    display: inline-block;
+    width: 0.95rem;
+    height: 0.95rem;
+    flex-shrink: 0;
+    background-color: var(--gold2);
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+  }
+
+  .mockup-note {
+    background: var(--gold-a12);
+    border: 1px dashed var(--bdr3);
+    border-radius: 8px;
+    padding: 0.9rem 1.1rem;
+    margin-bottom: 1.5rem;
+    font-family: var(--fl);
+    font-size: 0.82rem;
+    color: var(--txt2);
+    line-height: 1.6;
+  }
+
+  .mockup-note b { color: var(--accent); }
+</style>
+</head>
+<body>
+<nav class="site-nav">
+  <a href="#" class="site-nav__tab">Characters</a>
+  <a href="#" class="site-nav__tab">World</a>
+  <a href="#" class="site-nav__tab is-active">Court</a>
+  <a href="#" class="site-nav__tab">Lore</a>
+</nav>
+<main class="content">
+  <div class="content__header">
+    <div>
+      <p class="content__eyebrow">Terra Mortis &middot; Mockup, not live</p>
+      <h1 class="content__title">Court</h1>
+    </div>
+  </div>
+
+  <div class="mockup-note">
+    <b>Design-lock mockup for story 3-1</b> &mdash; static HTML, no live data. Deliberately does
+    <b>NOT</b> include a player-name line under each character (TM Suite's internal admin view shows
+    ST-only real names; this wiki's data model has no such field at all, so there is nothing to
+    redact &mdash; it is simply never fetched). Clan is shown as a text label, not an icon &mdash;
+    only covenant icons exist as web assets in this repo so far; porting the 5 clan icons
+    (Daeva/Gangrel/Mekhet/Nosferatu/Ventrue, same source folder as the covenant set) is a follow-up,
+    not blocking this story. "Regencies" below lists Regents only, one row per territory &mdash;
+    Lieutenants stay on the existing per-territory Regent/Lieutenant cards elsewhere on this page,
+    they are a territorial role, not a personal title, so they don't carry a badge of their own here.
+  </div>
+
+  <details class="roster-section" open>
+    <summary class="roster-section__head">
+      <span class="roster-section__chevron"></span>
+      <span>Court</span>
+      <span class="roster-section__count">6</span>
+    </summary>
+    <div class="roster-section__body">
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Eve Lockridge</span>
+        <span class="roster-row__badges">
+          <span class="roster-badge">Head of State</span>
+          <span class="roster-clan">Daeva</span>
+          <span class="roster-cov-icon" style="mask-image:url(../../../public/img/covenant/carthian-movement.svg)"></span>
+        </span>
+      </a>
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Rene St. Dominique</span>
+        <span class="roster-row__badges">
+          <span class="roster-badge">Primogen</span>
+          <span class="roster-clan">Ventrue</span>
+          <span class="roster-cov-icon" style="mask-image:url(../../../public/img/covenant/lancea-et-sanctum.svg)"></span>
+        </span>
+      </a>
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Yusuf Kalusicj</span>
+        <span class="roster-row__badges">
+          <span class="roster-badge">Primogen</span>
+          <span class="roster-clan">Nosferatu</span>
+          <span class="roster-cov-icon" style="mask-image:url(../../../public/img/covenant/carthian-movement.svg)"></span>
+        </span>
+      </a>
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Ivana Horvat</span>
+        <span class="roster-row__badges">
+          <span class="roster-badge">Administrator</span>
+          <span class="roster-clan">Gangrel</span>
+          <span class="roster-cov-icon" style="mask-image:url(../../../public/img/covenant/circle-of-the-crone.svg)"></span>
+        </span>
+      </a>
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Brandy LaRoux</span>
+        <span class="roster-row__badges">
+          <span class="roster-badge">Socialite</span>
+          <span class="roster-clan">Gangrel</span>
+          <span class="roster-cov-icon" style="mask-image:url(../../../public/img/covenant/circle-of-the-crone.svg)"></span>
+        </span>
+      </a>
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Doc</span>
+        <span class="roster-row__badges">
+          <span class="roster-badge">Enforcer</span>
+          <span class="roster-clan">Gangrel</span>
+          <span class="roster-cov-icon" style="mask-image:url(../../../public/img/covenant/carthian-movement.svg)"></span>
+        </span>
+      </a>
+    </div>
+  </details>
+
+  <details class="roster-section" open>
+    <summary class="roster-section__head">
+      <span class="roster-section__chevron"></span>
+      <span>Regencies</span>
+      <span class="roster-section__count">5</span>
+    </summary>
+    <div class="roster-section__body">
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Jack Fallow</span>
+        <span class="roster-row__badges">
+          <span class="roster-badge">The Academy</span>
+          <span class="roster-clan">Mekhet</span>
+          <span class="roster-cov-icon" style="mask-image:url(../../../public/img/covenant/circle-of-the-crone.svg)"></span>
+        </span>
+      </a>
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Livia</span>
+        <span class="roster-row__badges">
+          <span class="roster-badge">The Dockyards</span>
+          <span class="roster-clan">Daeva</span>
+          <span class="roster-cov-icon" style="mask-image:url(../../../public/img/covenant/carthian-movement.svg)"></span>
+        </span>
+      </a>
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Reed Justice</span>
+        <span class="roster-row__badges">
+          <span class="roster-badge">The Harbour</span>
+          <span class="roster-clan">Ventrue</span>
+          <span class="roster-cov-icon" style="mask-image:url(../../../public/img/covenant/invictus.svg)"></span>
+        </span>
+      </a>
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Alice Vunder</span>
+        <span class="roster-row__badges">
+          <span class="roster-badge">The North Shore</span>
+          <span class="roster-clan">Mekhet</span>
+          <span class="roster-cov-icon" style="mask-image:url(../../../public/img/covenant/circle-of-the-crone.svg)"></span>
+        </span>
+      </a>
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Rene Meyer</span>
+        <span class="roster-row__badges">
+          <span class="roster-badge">The Second City</span>
+          <span class="roster-clan">Daeva</span>
+          <span class="roster-cov-icon" style="mask-image:url(../../../public/img/covenant/carthian-movement.svg)"></span>
+        </span>
+      </a>
+    </div>
+  </details>
+
+  <details class="roster-section" open>
+    <summary class="roster-section__head">
+      <span class="roster-section__chevron"></span>
+      <span>Who's Who</span>
+      <span class="roster-section__count">10</span>
+    </summary>
+    <div class="roster-section__body">
+      <div class="roster-group__head">
+        <span class="roster-group__icon" style="mask-image:url(../../../public/img/covenant/carthian-movement.svg)"></span>
+        <span>Carthian Movement</span>
+      </div>
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Aleksei Romanov</span>
+        <span class="roster-row__badges">
+          <span class="roster-clan">Daeva</span>
+        </span>
+      </a>
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Doc</span>
+        <span class="roster-row__badges">
+          <span class="roster-badge">Enforcer</span>
+          <span class="roster-clan">Gangrel</span>
+        </span>
+      </a>
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Eve Lockridge</span>
+        <span class="roster-row__badges">
+          <span class="roster-badge">Head of State</span>
+          <span class="roster-clan">Daeva</span>
+        </span>
+      </a>
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Yusuf Kalusicj</span>
+        <span class="roster-row__badges">
+          <span class="roster-badge">Primogen</span>
+          <span class="roster-clan">Nosferatu</span>
+        </span>
+      </a>
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Xavier Boussade</span>
+        <span class="roster-row__badges">
+          <span class="roster-clan">Nosferatu</span>
+        </span>
+      </a>
+
+      <div class="roster-group__head">
+        <span class="roster-group__icon" style="mask-image:url(../../../public/img/covenant/circle-of-the-crone.svg)"></span>
+        <span>Circle of the Crone</span>
+      </div>
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Alice Vunder</span>
+        <span class="roster-row__badges">
+          <span class="roster-badge">The North Shore</span>
+          <span class="roster-clan">Mekhet</span>
+        </span>
+      </a>
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Anichka</span>
+        <span class="roster-row__badges">
+          <span class="roster-badge">Hierophant</span>
+          <span class="roster-clan">Mekhet</span>
+        </span>
+      </a>
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Brandy LaRoux</span>
+        <span class="roster-row__badges">
+          <span class="roster-badge">Socialite</span>
+          <span class="roster-clan">Gangrel</span>
+        </span>
+      </a>
+
+      <div class="roster-group__head">
+        <span class="roster-group__icon" style="mask-image:url(../../../public/img/covenant/lancea-et-sanctum.svg)"></span>
+        <span>Lancea et Sanctum</span>
+      </div>
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Rene St. Dominique</span>
+        <span class="roster-row__badges">
+          <span class="roster-badge">Primogen</span>
+          <span class="roster-clan">Ventrue</span>
+        </span>
+      </a>
+      <a class="roster-row" href="#">
+        <span class="roster-row__name">Conrad Sondergaard</span>
+        <span class="roster-row__badges">
+          <span class="roster-clan">Mekhet</span>
+        </span>
+      </a>
+    </div>
+  </details>
+</main>
+</body>
+</html>

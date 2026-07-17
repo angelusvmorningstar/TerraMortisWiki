@@ -360,8 +360,8 @@ test('AC #2/#7(c) [LEAK-GATE]: the list endpoint leaks no owner-only field for a
   await withServer(async (base) => {
     const { status, rawBody, body } = await getAs(base, '111', '/api/characters');
     assert.equal(status, 200);
-    // roster size comes from Mongo, not a literal
-    assert.equal(body.characters.length, TEST_CHARACTERS.length);
+    // roster size comes from Mongo (minus retired), not a literal
+    assert.equal(body.characters.length, TEST_CHARACTERS.filter((c) => !c.retired).length);
     // no owner-only field anywhere in the serialised list
     for (const f of OWNER_ONLY_FIELDS) {
       assert.ok(!rawBody.includes(`"${f}"`), `LEAK: list entry exposes owner-only field ${f}`);
@@ -371,9 +371,14 @@ test('AC #2/#7(c) [LEAK-GATE]: the list endpoint leaks no owner-only field for a
       const allowed = new Set(['_id', ...SUMMARY_FIELDS]);
       for (const k of Object.keys(entry)) assert.ok(allowed.has(k), `list entry has unexpected field ${k}`);
     }
-    // retired flag preserved (charC is retired)
-    const caz = body.characters.find((c) => c._id === 'charC');
-    assert.equal(caz.retired, true);
+  });
+});
+
+test('retired characters are excluded from the roster list (charC is retired)', async () => {
+  installTestDb();
+  await withServer(async (base) => {
+    const { body } = await getAs(base, '111', '/api/characters');
+    assert.ok(!body.characters.some((c) => c._id === 'charC'), 'retired character charC must not appear in the list');
   });
 });
 
@@ -381,8 +386,9 @@ test('AC #2: the list is sorted by sortName (moniker || name), case-insensitive'
   installTestDb();
   await withServer(async (base) => {
     const { body } = await getAs(base, '111', '/api/characters');
-    // Ambrose (A, moniker null -> "ambrose"), Bea (B moniker "Bea" -> "bea"), Cazimir ("cazimir")
-    assert.deepEqual(body.characters.map((c) => c._id), ['charA', 'charB', 'charC']);
+    // Ambrose (A, moniker null -> "ambrose"), Bea (B moniker "Bea" -> "bea")
+    // Cazimir (C) is retired and excluded from the list entirely.
+    assert.deepEqual(body.characters.map((c) => c._id), ['charA', 'charB']);
   });
 });
 

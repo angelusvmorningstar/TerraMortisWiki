@@ -65,23 +65,28 @@
 /* Space between two adjacent cross-links (e.g. World and Lore on the roster). */
 .backlink + .backlink { margin-left: 1.25rem; }
 
-/* ── Character grid + cards ── */
+/* ── Character grid + cards ──
+   Vertical, centred layout: covenant-icon crest above the name, no text
+   chips (clan/covenant convey visually via the icon, not read on the roster
+   — see the character's own profile page for clan/covenant/bloodline text). */
 .char-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
   gap: 1rem;
 }
 
 .char-card {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.9rem;
+  gap: 0.6rem;
   background: var(--surf);
   border: 1px solid var(--bdr2);
   border-radius: 10px;
-  padding: 1rem 1.1rem;
+  padding: 1.1rem 0.8rem;
   text-decoration: none;
   color: var(--txt);
+  text-align: center;
   transition: border-color 0.15s, background 0.15s;
 }
 
@@ -93,19 +98,42 @@
 /* Retired characters: muted/marked, never hidden (AC #9). */
 .char-card--retired { opacity: 0.72; }
 .char-card--retired .char-card__name { color: var(--txt3); }
+.char-card--retired .char-card__icon,
+.char-card--retired .portrait { opacity: 0.7; }
 
 .char-card__body { min-width: 0; }
+
+/* Covenant crest — a flat-silhouette SVG recoloured via CSS mask so it always
+   matches the theme token, in both themes, with no baked-in colour asset. */
+.char-card__icon {
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 2.75rem;
+  background-color: var(--gold2);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.char-card__icon--carthian-movement { -webkit-mask-image: url('/img/covenant/carthian-movement.svg'); mask-image: url('/img/covenant/carthian-movement.svg'); }
+.char-card__icon--circle-of-the-crone { -webkit-mask-image: url('/img/covenant/circle-of-the-crone.svg'); mask-image: url('/img/covenant/circle-of-the-crone.svg'); }
+.char-card__icon--invictus { -webkit-mask-image: url('/img/covenant/invictus.svg'); mask-image: url('/img/covenant/invictus.svg'); }
+.char-card__icon--lancea-et-sanctum { -webkit-mask-image: url('/img/covenant/lancea-et-sanctum.svg'); mask-image: url('/img/covenant/lancea-et-sanctum.svg'); }
+.char-card__icon--ordo-dracul { -webkit-mask-image: url('/img/covenant/ordo-dracul.svg'); mask-image: url('/img/covenant/ordo-dracul.svg'); }
 
 .char-card__name {
   display: block;
   font-family: var(--fh);
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: 0.02em;
+  line-height: 1.3;
   color: var(--gold2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 .char-card__meta {
@@ -168,15 +196,107 @@
   font-size: 3rem;
 }
 
-/* ── Profile page ── */
+/* ── Profile page — a case-file "cover sheet" ──
+   A bordered letterhead (photo well + identity block) standing apart from the
+   page body below it, echoing a subject dossier rather than a web app header. */
 .profile__head {
+  position: relative;
   display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  margin-bottom: 1.5rem;
+  flex-direction: column;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  background:
+    repeating-linear-gradient(0deg, var(--gold-a8) 0px, transparent 1px, transparent 3px),
+    repeating-linear-gradient(90deg, var(--gold-a8) 0px, transparent 1px, transparent 5px),
+    var(--surf);
+  background-size: 100% 3px, 5px 100%, auto;
+  border: 1px solid var(--bdr2);
+  border-radius: 4px;
+  box-shadow: 0 0 0 4px var(--bg), 0 0 0 5px var(--bdr2);
+  overflow: hidden;
 }
 
-.profile__id { min-width: 0; }
+.profile__top {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+/* A stamped mark — carries real information (which tier you're looking at),
+   not pure decoration. Only two states exist; a third tier is never rendered
+   here since the server only ever returns 'owner' or 'summary'. */
+.profile__stamp {
+  position: absolute;
+  top: 1rem;
+  right: -0.5rem;
+  padding: 0.3rem 1.6rem;
+  font-family: var(--fh);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border: 2px solid;
+  border-radius: 3px;
+  transform: rotate(6deg);
+  opacity: 0.8;
+  user-select: none;
+}
+
+.profile__stamp--summary {
+  color: var(--crim, var(--accent));
+  border-color: var(--crim, var(--accent));
+}
+
+.profile__stamp--owner {
+  color: var(--gold2);
+  border-color: var(--gold2);
+}
+
+/* Placeholder headshot — a portrait-ratio "photo not on file" well. No image
+   data exists in the character schema; this is deliberately a placeholder,
+   not a broken <img>. */
+.profile__photo {
+  flex-shrink: 0;
+  width: 6.5rem;
+  aspect-ratio: 3 / 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  background: var(--gold-a8);
+  border: 1px solid var(--bdr2);
+  border-radius: 3px;
+}
+
+.profile__photo-icon {
+  width: 2.4rem;
+  height: 2.4rem;
+  color: var(--gold-a30);
+}
+
+.profile__photo-caption {
+  font-family: var(--fl);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--txt3);
+  text-align: center;
+  line-height: 1.3;
+  padding: 0 0.3rem;
+}
+
+.profile__id { min-width: 0; padding-top: 0.15rem; }
+
+.profile__eyebrow {
+  font-family: var(--fl);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 0.35rem;
+}
 
 .profile__name {
   margin: 0;
@@ -184,13 +304,50 @@
   font-size: clamp(1.6rem, 4.5vw, 2.4rem);
   font-weight: 700;
   color: var(--gold2);
+  line-height: 1.1;
 }
 
-.profile__factions {
+/* Vitals — a tight quick-glance table (label left, value right), not badges.
+   Sits inside the same dossier panel as the header, not a separate block. */
+.profile__vitals {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--bdr);
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-top: 0.6rem;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.profile__vitals .vital-row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.profile__vitals .vital-row__label {
+  flex: 0 0 8rem;
+  font-family: var(--fl);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--txt3);
+  padding-top: 0.15rem;
+}
+
+.profile__vitals .vital-row__value {
+  font-family: var(--fh);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--txt2);
+}
+
+.profile__vitals .vital-row__value--cov { color: var(--gold2); }
+.profile__vitals .vital-row__value--retired { color: var(--crim, var(--accent)); }
+
+.profile__divider {
+  margin: 1.5rem 0 1.1rem;
+  border: none;
+  border-top: 1px solid var(--bdr);
 }
 
 .profile__section {
@@ -205,35 +362,41 @@
   text-transform: uppercase;
   color: var(--accent);
   margin: 0 0 0.9rem;
-  padding-bottom: 0.5rem;
+}
+
+/* Dossier facts — flowing label:value lines within the same panel as the
+   letterhead, read as one continuous brief rather than scattered cards. */
+.facts {
+  display: flex;
+  flex-direction: column;
+}
+
+.fact {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.6rem;
+  padding: 0.55rem 0;
   border-bottom: 1px solid var(--bdr);
 }
 
-/* Dossier facts */
-.facts { display: flex; flex-direction: column; gap: 0.75rem; }
-
-.fact {
-  background: var(--surf);
-  border: 1px solid var(--bdr);
-  border-left: 3px solid var(--gold-a30);
-  border-radius: 8px;
-  padding: 0.75rem 1rem;
-}
+.fact:last-child { border-bottom: none; }
 
 .fact__tag {
-  font-family: var(--fl);
-  font-size: 0.68rem;
-  font-variant: small-caps;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--txt3);
-  margin-bottom: 0.25rem;
+  flex: 0 0 10rem;
+  font-family: var(--fh);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--gold2);
 }
 
+.fact__tag::after { content: ':'; }
+
 .fact__value {
+  flex: 1 1 16rem;
+  min-width: 0;
   font-family: var(--ft);
-  font-size: 0.98rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
   color: var(--txt);
 }
 
@@ -447,3 +610,294 @@ a.office-seat:hover { border-color: var(--bdr3); }
   border: none;
   border-top: 1px solid var(--bdr2);
 }
+
+/* ══════════════════════════════════════════
+   SITE NAV — persistent top ribbon (Characters / World / Court / Lore),
+   replacing the old per-page "<- back" / "Next ->" backlink pattern.
+   ══════════════════════════════════════════ */
+
+.site-nav {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0 auto 2rem;
+  max-width: 72rem;
+  padding: 1.25rem 1.5rem 0;
+  border-bottom: 1px solid var(--bdr2);
+}
+
+.site-nav__tab {
+  padding: 0.6rem 1rem;
+  font-family: var(--fh);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--txt2);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.site-nav__tab:hover {
+  color: var(--gold2);
+}
+
+.site-nav__tab.is-active {
+  color: var(--gold2);
+  border-bottom-color: var(--gold2);
+}
+
+/* ══════════════════════════════════════════
+   WORLD MAP — Leaflet map of Sydney's vampire territories, the Exclusion
+   Zone, and Elysium. Tile imagery gets a desaturated/sepia CSS filter so it
+   reads as parchment, matching the rest of the site, rather than a raw
+   OpenStreetMap tile look.
+   ══════════════════════════════════════════ */
+
+.world-map {
+  height: 65vh;
+  min-height: 22rem;
+  border: 1px solid var(--bdr2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.world-map .world-map__tiles {
+  filter: sepia(0.35) saturate(0.55) brightness(1.04) contrast(0.96);
+}
+
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin-bottom: 1rem;
+  font-family: var(--fl);
+  font-size: 0.8rem;
+  color: var(--txt2);
+}
+
+.map-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.map-legend__swatch {
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 3px;
+  border: 1px solid var(--bdr2);
+}
+
+.map-legend__swatch--territory { background: #7a2020; }
+.map-legend__swatch--exclusion { background: #2a2019; }
+.map-legend__swatch--elysium { background: #96742f; }
+
+/* Leaflet's own popup chrome, retokenised so it doesn't look like an
+   unstyled browser default dropped onto a themed page. */
+.leaflet-popup-content-wrapper {
+  background: var(--surf);
+  color: var(--txt);
+  border-radius: 6px;
+  font-family: var(--ft);
+}
+
+.leaflet-popup-tip {
+  background: var(--surf);
+}
+
+/* Territory name labels on the map — permanent tooltips, styled as plain
+   text with a parchment-coloured halo so they read over any tile beneath,
+   mirroring the ST cockpit map's own terr-label treatment. */
+.terr-label {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  color: var(--txt);
+  font-family: var(--fh);
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow:
+    0 0 3px var(--bg), 0 0 3px var(--bg),
+    0 0 2px var(--bg), 0 0 2px var(--bg);
+}
+
+.terr-label::before {
+  display: none;
+}
+
+/* ── Court page roster sections (story 3-1) ──────────────────────────────────
+   Three native <details>/<summary> accordions (Court / Regencies / Who's Who),
+   folded from specs/mockups/3-1-world-status-layout/mockup.html. Tokens-only.
+   The mockup's #fff fallback on the badge and its inline mask-image styles were
+   mockup-only shortcuts and are corrected here (bare --txt-on-dark; crest via
+   the --<slug> modifier classes below, never an inline style). */
+
+.roster-section {
+  background: var(--surf);
+  border: 1px solid var(--bdr2);
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+
+.roster-section__head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.9rem 1.1rem;
+  cursor: pointer;
+  list-style: none;
+  font-family: var(--fh);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--txt);
+}
+
+.roster-section__head::-webkit-details-marker { display: none; }
+
+.roster-section__chevron {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-right: 2px solid var(--txt3);
+  border-bottom: 2px solid var(--txt3);
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+
+.roster-section[open] > .roster-section__head > .roster-section__chevron {
+  transform: rotate(45deg);
+}
+
+.roster-section__count {
+  font-family: var(--fl);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--txt3);
+  background: var(--surf2);
+  border: 1px solid var(--bdr);
+  border-radius: 10px;
+  padding: 0.05rem 0.5rem;
+}
+
+.roster-section__body {
+  border-top: 1px solid var(--bdr2);
+}
+
+/* Covenant sub-group inside Who's Who — its own bar, not a nested accordion. */
+.roster-group__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1.1rem;
+  background: var(--surf2);
+  border-bottom: 1px solid var(--bdr);
+  font-family: var(--fh);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* display: inline-block is load-bearing — a mask-image on a default-inline span
+   collapses to a zero-size box and renders nothing at all (story 3-1 AC #10). */
+.roster-group__icon {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  background-color: var(--accent);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.roster-group__icon--carthian-movement { -webkit-mask-image: url('/img/covenant/carthian-movement.svg'); mask-image: url('/img/covenant/carthian-movement.svg'); }
+.roster-group__icon--circle-of-the-crone { -webkit-mask-image: url('/img/covenant/circle-of-the-crone.svg'); mask-image: url('/img/covenant/circle-of-the-crone.svg'); }
+.roster-group__icon--invictus { -webkit-mask-image: url('/img/covenant/invictus.svg'); mask-image: url('/img/covenant/invictus.svg'); }
+.roster-group__icon--lancea-et-sanctum { -webkit-mask-image: url('/img/covenant/lancea-et-sanctum.svg'); mask-image: url('/img/covenant/lancea-et-sanctum.svg'); }
+.roster-group__icon--ordo-dracul { -webkit-mask-image: url('/img/covenant/ordo-dracul.svg'); mask-image: url('/img/covenant/ordo-dracul.svg'); }
+
+.roster-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 1.1rem;
+  border-bottom: 1px solid var(--bdr);
+  text-decoration: none;
+  transition: background 0.12s;
+}
+
+a.roster-row:hover { background: var(--surf2); }
+.roster-row:last-child { border-bottom: none; }
+
+.roster-row__name {
+  font-family: var(--fh);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--gold2);
+}
+
+.roster-row__badges {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.roster-badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--fl);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--txt-on-dark);
+  background: var(--crim);
+  border-radius: 10px;
+  padding: 0.15rem 0.55rem;
+  white-space: nowrap;
+}
+
+.roster-clan {
+  font-family: var(--fl);
+  font-size: 0.72rem;
+  font-variant: small-caps;
+  color: var(--txt2);
+  white-space: nowrap;
+}
+
+/* display: inline-block is load-bearing here too (story 3-1 AC #10). */
+.roster-cov-icon {
+  display: inline-block;
+  width: 0.95rem;
+  height: 0.95rem;
+  flex-shrink: 0;
+  background-color: var(--gold2);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.roster-cov-icon--carthian-movement { -webkit-mask-image: url('/img/covenant/carthian-movement.svg'); mask-image: url('/img/covenant/carthian-movement.svg'); }
+.roster-cov-icon--circle-of-the-crone { -webkit-mask-image: url('/img/covenant/circle-of-the-crone.svg'); mask-image: url('/img/covenant/circle-of-the-crone.svg'); }
+.roster-cov-icon--invictus { -webkit-mask-image: url('/img/covenant/invictus.svg'); mask-image: url('/img/covenant/invictus.svg'); }
+.roster-cov-icon--lancea-et-sanctum { -webkit-mask-image: url('/img/covenant/lancea-et-sanctum.svg'); mask-image: url('/img/covenant/lancea-et-sanctum.svg'); }
+.roster-cov-icon--ordo-dracul { -webkit-mask-image: url('/img/covenant/ordo-dracul.svg'); mask-image: url('/img/covenant/ordo-dracul.svg'); }

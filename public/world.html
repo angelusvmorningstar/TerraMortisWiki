@@ -6,33 +6,37 @@
 <title>Terra Mortis Wiki: World</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@400;700&family=Lato:wght@400;600;700;900&family=Libre+Baskerville:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <link rel="stylesheet" href="/css/theme.css">
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/components.css">
 </head>
 <body>
+<nav class="site-nav">
+  <a href="/characters.html" class="site-nav__tab">Characters</a>
+  <a href="/world.html" class="site-nav__tab is-active">World</a>
+  <a href="/court.html" class="site-nav__tab">Court</a>
+  <a href="/lore.html" class="site-nav__tab">Lore</a>
+</nav>
 <main class="content">
-  <a class="backlink" href="/characters.html">&larr; All characters</a>
-  <a class="backlink" href="/lore.html">Lore &rarr;</a>
   <div class="content__header">
     <div>
       <p class="content__eyebrow">Terra Mortis</p>
-      <h1 class="content__title">World and Court</h1>
+      <h1 class="content__title">World</h1>
     </div>
   </div>
   <p class="hero__status" id="status" hidden></p>
 
-  <section class="profile__section" id="territories-section">
-    <h2 class="profile__section-title">Territories</h2>
-    <div id="territories"></div>
-  </section>
+  <div class="map-legend">
+    <span class="map-legend__item"><span class="map-legend__swatch map-legend__swatch--territory"></span>Vampire territory</span>
+    <span class="map-legend__item"><span class="map-legend__swatch map-legend__swatch--exclusion"></span>Exclusion Zone</span>
+    <span class="map-legend__item"><span class="map-legend__swatch map-legend__swatch--elysium"></span>Elysium</span>
+  </div>
 
-  <section class="profile__section" id="court-section">
-    <h2 class="profile__section-title">Court and titles</h2>
-    <div id="court"></div>
-  </section>
+  <div id="map" class="world-map" role="img" aria-label="Map of Sydney showing vampire court territories, the Exclusion Zone, and Elysium"></div>
 </main>
 
-<script type="module" src="/js/world/world.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script type="module" src="/js/world/map.js"></script>
 </body>
 </html>

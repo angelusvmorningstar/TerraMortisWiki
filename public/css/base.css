@@ -96,6 +96,10 @@ body {
   gap: 1.25rem;
 }
 
+#post-login-nav[hidden] {
+  display: none;
+}
+
 #post-login-nav .backlink {
   margin: 0;
 }
