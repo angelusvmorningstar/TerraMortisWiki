@@ -21,6 +21,7 @@ import { connectDb, closeDb } from './db.js';
 import authRouter from './routes/auth.js';
 import charactersRouter from './routes/characters.js';
 import worldRouter from './routes/world.js';
+import statusRouter from './routes/status.js';
 import loreRouter from './routes/lore.js';
 import { requireAuth } from './middleware/auth.js';
 
@@ -82,6 +83,14 @@ export function createApp() {
   // per-viewer projection beyond the login gate — but it still allowlist-projects
   // every holder object (never a raw-document spread). No new auth logic.
   app.use('/api', worldRouter);
+
+  // Status router (Story 3.2). Mounted AFTER the auth gate, alongside the
+  // characters and world routers. It is the SECOND per-viewer authorisation
+  // boundary in the repo (after the characters router) and the FIRST route to
+  // return any character `status` field: the covenant/clan ladders a viewer
+  // receives are gated server-side in buildStatusView BEFORE the response leaves
+  // Express, so no faction's internal standing reaches a viewer outside it.
+  app.use('/api', statusRouter);
 
   // Lore router (Story 2.3). Mounted AFTER the auth gate, alongside the characters
   // and world routers. It reads NO Mongo and issues NO writes — its only I/O is

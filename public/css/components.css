@@ -50,6 +50,24 @@
   color: var(--txt3);
 }
 
+/* Header cross-link sitting on the right of a .content__header flex row
+   (Court <-> Status). Tokens-only; matches the .backlink accent treatment. */
+.content__link {
+  align-self: center;
+  font-family: var(--fh);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-decoration: none;
+  border: 1px solid var(--bdr2);
+  border-radius: 6px;
+  padding: 0.4rem 0.9rem;
+  transition: background 0.12s, color 0.12s;
+}
+
+.content__link:hover { background: var(--gold-a8); color: var(--gold2); }
+
 .backlink {
   display: inline-block;
   margin-bottom: 1.25rem;
@@ -901,3 +919,103 @@ a.roster-row:hover { background: var(--surf2); }
 .roster-cov-icon--invictus { -webkit-mask-image: url('/img/covenant/invictus.svg'); mask-image: url('/img/covenant/invictus.svg'); }
 .roster-cov-icon--lancea-et-sanctum { -webkit-mask-image: url('/img/covenant/lancea-et-sanctum.svg'); mask-image: url('/img/covenant/lancea-et-sanctum.svg'); }
 .roster-cov-icon--ordo-dracul { -webkit-mask-image: url('/img/covenant/ordo-dracul.svg'); mask-image: url('/img/covenant/ordo-dracul.svg'); }
+
+/* ══════════════════════════════════════════
+   STATUS LADDERS - City / Covenant / Clan dot tiers (story 3-2:
+   covenant-clan-status-ladders). Ported from specs/mockups/3-2-status-ladders/
+   mockup.html (the locked design reference), tokens-only, extending the
+   .roster-section accordion shell rather than introducing a new paradigm.
+   ══════════════════════════════════════════ */
+
+/* Subheading under a ladder naming WHOSE standing is shown, in words, so the
+   per-viewer gating reads as intentional rather than an incomplete page. */
+.ladder-subheading {
+  padding: 0.7rem 1.1rem 0;
+  font-family: var(--ft);
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--txt2);
+}
+
+.ladder-subheading b { font-style: normal; color: var(--accent); }
+
+/* A single value tier: a dot bar + numeric value in the head, then the chips of
+   every character at that value. */
+.tier {
+  margin: 0.75rem 1.1rem;
+  background: var(--surf2);
+  border: 1px solid var(--bdr);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.tier--mine {
+  border-color: var(--accent);
+  background: var(--gold-a8);
+}
+
+.tier__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  background: var(--surf3);
+  border-bottom: 1px solid var(--bdr);
+}
+
+.tier__dots {
+  color: var(--accent);
+}
+
+.tier__val {
+  font-family: var(--fl);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: var(--txt3);
+}
+
+.tier__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.6rem 0.75rem;
+}
+
+.tier-chip {
+  font-family: var(--fl);
+  font-size: 0.75rem;
+  color: var(--txt);
+  background: var(--surf);
+  border: 1px solid var(--bdr);
+  border-radius: 12px;
+  padding: 0.2rem 0.65rem;
+}
+
+/* The viewer's OWN character, highlighted so they can find themselves at a glance. */
+.tier-chip--me {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* .pointed / .pointed.hollow - ported verbatim from ../TM Suite/public/css/
+   components.css (not previously present in this repo; this story is the first
+   thing here to need it). An 8px filled currentColor circle; a 7px hollow
+   currentColor ring for the unfilled remainder. currentColor is set by the
+   ancestor (.tier__dots uses var(--accent)). */
+.pointed {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  margin: 0 1px;
+  vertical-align: middle;
+}
+
+.pointed.hollow {
+  background: transparent;
+  border: 1.5px solid currentColor;
+  width: 7px;
+  height: 7px;
+}

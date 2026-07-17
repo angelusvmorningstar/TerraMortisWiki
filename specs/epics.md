@@ -130,13 +130,20 @@ Acceptance criteria:
 
 Out of scope for 3-1: the status ladder (Story 3-2), clan icons as SVG assets, and any change to `/api/world` / `/api/characters` / the World map page.
 
-### Story 3-2: covenant-clan-status-ladder (backlog)
+### Story 3-2: covenant-clan-status-ladders
 
-**As** a player, **I want** to see the covenant and clan status ladder for my own covenant and clan, **so that** I understand where I and my faction-mates stand without seeing the internal standing of factions I do not belong to.
+**As** a player, **I want** to see the City, Covenant, and Clan status ladders for my own covenant(s) and clan, **so that** I understand where I and my faction-mates stand without ever seeing the internal standing of factions I do not belong to.
 
-Acceptance criteria (seed):
-- A per-viewer status ladder for covenant(s) and clan, gated so a non-ST viewer sees ONLY the ladder for the covenant(s)/clan their OWN character belongs to, mirroring TM Suite's `covenantListFor` / `clanRowsFor` gating exactly. This is genuinely new per-viewer access-control/projection logic (unlike Story 3-1, which is pure presentation over already-safe data), so the projection boundary is server-side and leak-tested in the same manner as Story 2-1.
-- Deferred and separately scoped; not built as part of Story 3-1.
+**Why this is security-critical (unlike 3-1)**: this is the FIRST route to read and return any character `status` field - `characters.js`'s `SUMMARY_FIELDS` and `world.js`'s `HOLDER_FIELDS` both exclude `status`. `getCharacters()` returns full, unredacted documents, so the new route's assembly/projection code is the ONLY place the covenant/clan gating happens. A mistake leaks one faction's internal standing to every logged-in player, including rivals with no in-character way to know it - the same risk class as Story 2-1. The gating is server-side, allowlist-projected, and leak-tested in the same manner. This is genuinely new per-viewer access-control logic, unlike Story 3-1 (pure presentation over already-safe payloads).
+
+Acceptance criteria:
+- A new read-only route `GET /api/status`, mounted after the `requireAuth` gate, whose work is done by a pure separately-testable `buildStatusView(characters, viewer)` (mirroring `buildWorldView`'s shape). Returns a **City Status** ladder for every non-retired character (ungated; identical for every viewer), PLUS **Covenant Status** ladders only for the viewer's own covenant(s) and a **Clan Status** ladder only for the viewer's own clan(s).
+- The covenant/clan gating ports TM Suite's `covenantListFor` / `covenantRowsFor` / `clanRowsFor` exactly (`../TM Suite/public/js/data/status-data.js`): the covenant list is the viewer's character's primary `covenant` plus any covenant with `status.covenant[cov] > 0`; a covenant ladder lists everyone with standing > 0 in it or whose primary is it; a clan ladder lists everyone of the viewer's clan. A ladder for a faction the viewer does not belong to must never appear in the response - server-side, before the wire, allowlist-constructed, never a `{ ...character }` / `{ ...character.status }` spread. Each row exposes ONLY the single scalar relevant to its ladder (that covenant's value, or `status.city`, or `status.clan`), never the whole `status.covenant` map. Leak-tested at the HTTP level with a discrimination negative-control, in the manner of Story 2-1.
+- **Multi-character owners** union their covenant list and clan set across ALL owned characters (`character_ids` is an array; no length-1 special-casing) - an explicit documented decision, since TM Suite's single-`rollChar` model does not have to make it.
+- **City Status shows the raw stored `status.city` value**, not TM Suite's computed `calcCityStatus` total (which adds court-title and regent-ambience bonuses and clamps to 10) - a documented simplification to keep numeric-correctness risk off an access-control story; a separable follow-up can add the computed total later.
+- **Frontend**: Status is its OWN page (`public/status.html` + `public/js/world/status.js`), NOT a fourth Court accordion and NOT a fifth `.site-nav` tab - the mockup renders a standalone Status page with the Court tab active, and the Court page links to it. Reuses the `.roster-section` accordion from 3-1 and ports `.pointed` / `.pointed.hollow` fresh from TM Suite (`ladder tiers grouped by value descending, empty tiers skipped`). A spectator with no character sees City Status in full plus honest empty states for Covenant/Clan (not an error, not everything). Built to the approved design lock (`specs/mockups/3-2-status-ladders/mockup.html`). British English, no em-dashes, tokens-only CSS.
+
+Out of scope for 3-2: any UI/route to SET status; the computed City-status total (title + ambience bonuses); a fifth nav tab; clan icons; any change to `/api/world`, `/api/characters`, or the World map page.
 
 ---
 

@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup: Status Ladders (story 3-2)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@400;700&family=Lato:wght@400;600;700;900&family=Libre+Baskerville:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../../public/css/theme.css">
+<link rel="stylesheet" href="../../../public/css/base.css">
+<link rel="stylesheet" href="../../../public/css/components.css">
+<style>
+  /* ── Mockup-only additions for story 3-2. Not production CSS yet — folded
+     into components.css once locked. Tokens-only, matching house style,
+     extending the .roster-section accordion pattern from story 3-1 rather
+     than introducing a new interaction paradigm (a tab/carousel switcher
+     would be a second way to switch views on one site — the accordion
+     already does this job and every other page uses it). ── */
+
+  .mockup-note {
+    background: var(--gold-a12);
+    border: 1px dashed var(--bdr3);
+    border-radius: 8px;
+    padding: 0.9rem 1.1rem;
+    margin-bottom: 1.5rem;
+    font-family: var(--fl);
+    font-size: 0.82rem;
+    color: var(--txt2);
+    line-height: 1.6;
+  }
+
+  .mockup-note b { color: var(--accent); }
+
+  .mockup-state-label {
+    font-family: var(--fh);
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--crim);
+    margin: 2.5rem 0 1rem;
+    padding-top: 2rem;
+    border-top: 2px dashed var(--bdr3);
+  }
+
+  .mockup-state-label:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+
+  /* A status ladder section (City / Covenant / Clan) — reuses .roster-section
+     for the accordion shell, adds a subheading naming WHOSE ladder this is,
+     so the gating itself is legible, not just functionally correct. */
+  .ladder-subheading {
+    padding: 0.7rem 1.1rem 0;
+    font-family: var(--ft);
+    font-size: 0.85rem;
+    font-style: italic;
+    color: var(--txt2);
+  }
+
+  .ladder-subheading b { font-style: normal; color: var(--accent); }
+
+  .tier {
+    margin: 0.75rem 1.1rem;
+    background: var(--surf2);
+    border: 1px solid var(--bdr);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .tier--mine {
+    border-color: var(--accent);
+    background: var(--gold-a8);
+  }
+
+  .tier__head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.75rem;
+    background: var(--surf3);
+    border-bottom: 1px solid var(--bdr);
+  }
+
+  .tier__dots {
+    color: var(--accent);
+  }
+
+  /* .pointed / .pointed.hollow — ported fresh from TM Suite's
+     public/css/components.css (not previously present in this repo; this
+     story is the first thing here to need it). Kept verbatim: an 8px filled
+     circle in currentColor, a 7px hollow ring for the unfilled remainder. */
+  .pointed {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    margin: 0 1px;
+    vertical-align: middle;
+  }
+
+  .pointed.hollow {
+    background: transparent;
+    border: 1.5px solid currentColor;
+    width: 7px;
+    height: 7px;
+  }
+
+  .tier__val {
+    font-family: var(--fl);
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    color: var(--txt3);
+  }
+
+  .tier__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0.6rem 0.75rem;
+  }
+
+  .tier-chip {
+    font-family: var(--fl);
+    font-size: 0.75rem;
+    color: var(--txt);
+    background: var(--surf);
+    border: 1px solid var(--bdr);
+    border-radius: 12px;
+    padding: 0.2rem 0.65rem;
+  }
+
+  .tier-chip--me {
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .empty-state {
+    margin: 0.75rem 1.1rem 1rem;
+  }
+</style>
+</head>
+<body>
+<nav class="site-nav">
+  <a href="#" class="site-nav__tab">Characters</a>
+  <a href="#" class="site-nav__tab">World</a>
+  <a href="#" class="site-nav__tab is-active">Court</a>
+  <a href="#" class="site-nav__tab">Lore</a>
+</nav>
+<main class="content">
+  <div class="content__header">
+    <div>
+      <p class="content__eyebrow">Terra Mortis &middot; Mockup, not live</p>
+      <h1 class="content__title">Status</h1>
+    </div>
+  </div>
+
+  <div class="mockup-note">
+    <b>Design-lock mockup for story 3-2</b> &mdash; static HTML, no live data, two states shown below.
+    <b>City Status is always fully public</b> &mdash; every logged-in viewer sees every character, no
+    gating, matching TM Suite's own rule exactly. <b>Covenant and Clan Status are gated</b>: a viewer
+    only sees the ladder for their own character's covenant(s) (primary plus any covenant they hold
+    standing &gt; 0 in) and their own clan &mdash; never another faction's internal ranking. The
+    subheading under each ladder names whose standing is shown, in words, so the gating reads as
+    intentional rather than an incomplete page. Dot indicators use TM Suite's own <b>.pointed</b> /
+    <b>.pointed.hollow</b> convention, ported fresh into this mockup &mdash; it does NOT exist in this
+    repo's components.css yet, this story is the first thing here that needs it. Accordion shell reuses <b>.roster-section</b> from story
+    3-1 rather than a tab or carousel switcher &mdash; this site already uses accordions everywhere
+    else, a second switching paradigm on one page would be inconsistent for no real gain (nobody is
+    on a phone mid-scene needing a swipe gesture the way TM Suite's live play tool is).
+  </div>
+
+  <p class="mockup-state-label">State A &mdash; viewer owns a Circle of the Crone character</p>
+
+  <details class="roster-section" open>
+    <summary class="roster-section__head">
+      <span class="roster-section__chevron"></span>
+      <span>City Status</span>
+      <span class="roster-section__count">10</span>
+    </summary>
+    <div class="roster-section__body">
+      <p class="ladder-subheading">Every character in the city, ranked. Always public.</p>
+      <div class="tier">
+        <div class="tier__head">
+          <span class="tier__dots"><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span></span>
+          <span class="tier__val">10</span>
+        </div>
+        <div class="tier__chips">
+          <span class="tier-chip">Yusuf Kalusicj</span>
+        </div>
+      </div>
+      <div class="tier">
+        <div class="tier__head">
+          <span class="tier__dots"><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed hollow"></span><span class="pointed hollow"></span><span class="pointed hollow"></span><span class="pointed hollow"></span></span>
+          <span class="tier__val">6</span>
+        </div>
+        <div class="tier__chips">
+          <span class="tier-chip">Eve Lockridge</span>
+          <span class="tier-chip tier-chip--me">Anichka</span>
+        </div>
+      </div>
+      <div class="tier">
+        <div class="tier__head">
+          <span class="tier__dots"><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed hollow"></span><span class="pointed hollow"></span><span class="pointed hollow"></span><span class="pointed hollow"></span><span class="pointed hollow"></span><span class="pointed hollow"></span><span class="pointed hollow"></span></span>
+          <span class="tier__val">3</span>
+        </div>
+        <div class="tier__chips">
+          <span class="tier-chip">Doc</span>
+          <span class="tier-chip">Rene St. Dominique</span>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <details class="roster-section" open>
+    <summary class="roster-section__head">
+      <span class="roster-section__chevron"></span>
+      <span>Covenant Status</span>
+      <span class="roster-section__count">4</span>
+    </summary>
+    <div class="roster-section__body">
+      <p class="ladder-subheading">Your covenant: <b>Circle of the Crone</b>. You only see standing within your own covenant.</p>
+      <div class="tier">
+        <div class="tier__head">
+          <span class="tier__dots"><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed hollow"></span></span>
+          <span class="tier__val">4</span>
+        </div>
+        <div class="tier__chips">
+          <span class="tier-chip">Brandy LaRoux</span>
+        </div>
+      </div>
+      <div class="tier">
+        <div class="tier__head">
+          <span class="tier__dots"><span class="pointed"></span><span class="pointed"></span><span class="pointed hollow"></span><span class="pointed hollow"></span><span class="pointed hollow"></span></span>
+          <span class="tier__val">2</span>
+        </div>
+        <div class="tier__chips">
+          <span class="tier-chip tier-chip--me">Anichka</span>
+          <span class="tier-chip">Alice Vunder</span>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <details class="roster-section" open>
+    <summary class="roster-section__head">
+      <span class="roster-section__chevron"></span>
+      <span>Clan Status</span>
+      <span class="roster-section__count">3</span>
+    </summary>
+    <div class="roster-section__body">
+      <p class="ladder-subheading">Your clan: <b>Mekhet</b>. You only see standing within your own clan.</p>
+      <div class="tier">
+        <div class="tier__head">
+          <span class="tier__dots"><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed hollow"></span><span class="pointed hollow"></span></span>
+          <span class="tier__val">3</span>
+        </div>
+        <div class="tier__chips">
+          <span class="tier-chip">Conrad Sondergaard</span>
+        </div>
+      </div>
+      <div class="tier">
+        <div class="tier__head">
+          <span class="tier__dots"><span class="pointed"></span><span class="pointed hollow"></span><span class="pointed hollow"></span><span class="pointed hollow"></span><span class="pointed hollow"></span></span>
+          <span class="tier__val">1</span>
+        </div>
+        <div class="tier__chips">
+          <span class="tier-chip tier-chip--me">Anichka</span>
+          <span class="tier-chip">Alice Vunder</span>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <p class="mockup-state-label">State B &mdash; viewer owns no character (spectator account)</p>
+
+  <details class="roster-section" open>
+    <summary class="roster-section__head">
+      <span class="roster-section__chevron"></span>
+      <span>City Status</span>
+      <span class="roster-section__count">10</span>
+    </summary>
+    <div class="roster-section__body">
+      <p class="ladder-subheading">Every character in the city, ranked. Always public.</p>
+      <div class="tier">
+        <div class="tier__head">
+          <span class="tier__dots"><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span><span class="pointed"></span></span>
+          <span class="tier__val">10</span>
+        </div>
+        <div class="tier__chips">
+          <span class="tier-chip">Yusuf Kalusicj</span>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <details class="roster-section">
+    <summary class="roster-section__head">
+      <span class="roster-section__chevron"></span>
+      <span>Covenant Status</span>
+      <span class="roster-section__count">0</span>
+    </summary>
+    <div class="roster-section__body">
+      <div class="empty-state">You don't have a character on file, so covenant standing isn't shown here. This is separate from City Status above, which is always public.</div>
+    </div>
+  </details>
+
+  <details class="roster-section">
+    <summary class="roster-section__head">
+      <span class="roster-section__chevron"></span>
+      <span>Clan Status</span>
+      <span class="roster-section__count">0</span>
+    </summary>
+    <div class="roster-section__body">
+      <div class="empty-state">You don't have a character on file, so clan standing isn't shown here.</div>
+    </div>
+  </details>
+</main>
+</body>
+</html>
