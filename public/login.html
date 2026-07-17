@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Lato:wght@400;600;700;900&family=Libre+Baskerville:wght@400;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/theme.css">
 <link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/components.css">
 </head>
 <body>
 <div class="page">
@@ -17,6 +18,11 @@
     <p class="hero__lede" id="lede">Sign in with the same Discord account you use for TM Suite.</p>
     <p class="hero__status" id="status" hidden></p>
     <a class="btn" id="login-btn" href="/auth/discord" hidden>Log in with Discord</a>
+    <nav id="post-login-nav" hidden>
+      <a class="backlink" href="/characters.html">Characters &rarr;</a>
+      <a class="backlink" href="/world.html">World and Court &rarr;</a>
+      <a class="backlink" href="/lore.html">Lore &rarr;</a>
+    </nav>
   </div>
 </div>
 
@@ -31,6 +37,7 @@
   const lede = document.getElementById('lede');
   const status = document.getElementById('status');
   const loginBtn = document.getElementById('login-btn');
+  const postLoginNav = document.getElementById('post-login-nav');
 
   function showStatus(message, isError) {
     status.textContent = message;
@@ -41,6 +48,7 @@
   function showLoggedIn(user) {
     lede.textContent = `Logged in as ${user.discord_username || user.username || 'you'}.`;
     loginBtn.hidden = true;
+    postLoginNav.hidden = false;
   }
 
   async function handleCallback(code, state) {

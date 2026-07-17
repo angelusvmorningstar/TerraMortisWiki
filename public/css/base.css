@@ -89,6 +89,17 @@ body {
   display: none;
 }
 
+#post-login-nav {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: center;
+  gap: 1.25rem;
+}
+
+#post-login-nav .backlink {
+  margin: 0;
+}
+
 .hero__status {
   margin-top: 1.5rem;
   font-size: 0.95rem;
