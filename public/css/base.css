@@ -85,6 +85,10 @@ body {
   background: var(--gold-a20);
 }
 
+.btn[hidden] {
+  display: none;
+}
+
 .hero__status {
   margin-top: 1.5rem;
   font-size: 0.95rem;
