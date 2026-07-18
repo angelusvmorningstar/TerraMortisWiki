@@ -38,7 +38,42 @@
 // from mongo-store.js.
 
 import express from 'express';
-import { getCharacters } from '../mongo-store.js';
+import { getCharacters, getTerritories } from '../mongo-store.js';
+import { isSuperViewer } from '../access.js';
+
+// City Status EFFECTIVE total (reversed 2026-07-18 — Angelus's explicit call,
+// after the raw-value-only AC #10 simplification produced a visibly wrong
+// ladder: several title-holders showed at their base value instead of the
+// tier the rest of the app already puts them at). Ported verbatim from
+// ../TM Suite/public/js/data/accessors.js's calcCityStatus/titleStatusBonus/
+// regentAmienceBonus and ../TM Suite/public/js/data/constants.js's
+// TITLE_STATUS_BONUS - verified against live data (Eve Lockridge 3+3=6
+// "Honoured", Yusuf Kalusicj 3+2=5 "Admired", Brandy LaRoux 3+1=4 "Respected"
+// all matched TM Suite's own rendered ladder exactly before this shipped).
+// Covenant/Clan values have no such bonus math in TM Suite - raw
+// status.covenant[cov] / status.clan is correct there and is unchanged.
+const TITLE_STATUS_BONUS = Object.freeze({ 'Head of State': 3, Primogen: 2, Socialite: 1, Enforcer: 1, Administrator: 1 });
+const REGENT_AMBIENCE_BONUS = Object.freeze({ Curated: 1, Verdant: 1, 'The Rack': 2 });
+
+// A character's regent territory, if any - String()-normalised match on
+// regent_id, mirroring world.js's resolveHolder join. Lieutenants
+// intentionally receive no ambience bonus (TM Suite issue #13 Q-A,
+// 2026-05-05 - regent-only by design).
+function regentTerritoryFor(character, territories) {
+  const cid = String(character._id);
+  return territories.find((t) => t && String(t.regent_id) === cid) ?? null;
+}
+
+// (status.city || 0) + title bonus (by court_category) + regent ambience
+// bonus (by the regent territory's ambience), clamped to 10 - matching TM
+// Suite's system cap on City Status exactly.
+function effectiveCityStatus(character, territories) {
+  const base = character.status?.city || 0;
+  const titleBonus = TITLE_STATUS_BONUS[character.court_category] || 0;
+  const regentTerritory = regentTerritoryFor(character, territories);
+  const ambienceBonus = REGENT_AMBIENCE_BONUS[regentTerritory?.ambience] || 0;
+  return Math.min(base + titleBonus + ambienceBonus, 10);
+}
 
 // The row display allowlist: the three name fields displayName/sortName need,
 // added alongside `_id`. NO attribute/skill/discipline/merit/XP/tracker field, and
@@ -96,8 +131,9 @@ function sortRows(rows) {
 //     clan:     { ladders: [ { name: <clan>, rows: [<row>] } ] }, // one per viewer-owned clan
 //   }
 // where <row> = { _id, name?, honorific?, moniker?, value, mine }.
-export function buildStatusView(characters, viewer) {
+export function buildStatusView(characters, territories, viewer) {
   const chars = Array.isArray(characters) ? characters : [];
+  const terrs = Array.isArray(territories) ? territories : [];
   const ownedSet = ownedIdSet(viewer);
 
   // The viewer's OWN characters - resolved by string-normalised set membership.
@@ -105,37 +141,43 @@ export function buildStatusView(characters, viewer) {
   // is retired still sees their own faction ladders. No length-1 special-casing.
   const owned = chars.filter((c) => c && ownedSet.has(String(c._id)));
 
-  // Covenant list (AC #4, #8): UNION across all owned characters of their primary
+  // Ladder ROWS are built from NON-retired characters only (AC #14) - a retired
+  // character is not current standing, so it appears in no ladder.
+  const active = chars.filter((c) => c && c.retired !== true);
+
+  // Which characters drive the covenant/clan LISTS (i.e. WHICH ladders a viewer
+  // receives). Normally: the viewer's own characters (so they see only their own
+  // factions). For the named-ST superviewer (Story 3.3, access.js), the source is
+  // the WHOLE active roster, so they receive every covenant/clan ladder that has
+  // a current member - full sight, matching TM Suite. Fail-closed: every other
+  // viewer, including another ST, uses `owned`.
+  const factionSource = isSuperViewer(viewer) ? active : owned;
+
+  // Covenant list (AC #4, #8): UNION across the source characters of their primary
   // `covenant` field PLUS every covenant key where they hold standing > 0.
   // Primary-first per character, de-duplicated, order-stable - extending TM
   // Suite's covenantListFor from one active char to the multi-character union.
   const covenantList = [];
-  for (const oc of owned) {
+  for (const oc of factionSource) {
     if (oc.covenant && !covenantList.includes(oc.covenant)) covenantList.push(oc.covenant);
     for (const [cov, v] of Object.entries(oc.status?.covenant || {})) {
       if ((v | 0) > 0 && !covenantList.includes(cov)) covenantList.push(cov);
     }
   }
 
-  // Clan set (AC #5, #8): UNION across all owned characters of their non-empty
+  // Clan set (AC #5, #8): UNION across the source characters of their non-empty
   // `clan` values, de-duplicated, order-stable.
   const clanList = [];
-  for (const oc of owned) {
+  for (const oc of factionSource) {
     if (oc.clan && !clanList.includes(oc.clan)) clanList.push(oc.clan);
   }
 
-  // Ladder ROWS are built from NON-retired characters only (AC #14) - a retired
-  // character is not current standing, so it appears in no ladder. This is
-  // independent of the covenant/clan derivation above, which DID include the
-  // viewer's own retired characters.
-  const active = chars.filter((c) => c && c.retired !== true);
-
-  // City ladder (AC #3, #10): every non-retired character, valued at the RAW
-  // stored status.city (default 0) - deliberately NOT TM Suite's computed
-  // calcCityStatus total (title + ambience bonuses), a documented simplification
-  // to keep numeric-correctness risk off this access-control story. Ungated:
-  // identical for every viewer regardless of covenant/clan/ownership.
-  const cityRows = sortRows(active.map((c) => statusRow(c, c.status?.city || 0, ownedSet)));
+  // City ladder: every non-retired character, valued at the EFFECTIVE city
+  // status (base + title bonus + regent ambience bonus, clamped to 10) -
+  // matching TM Suite's own calcCityStatus exactly (see effectiveCityStatus
+  // above). Ungated: identical for every viewer regardless of covenant/clan/
+  // ownership.
+  const cityRows = sortRows(active.map((c) => statusRow(c, effectiveCityStatus(c, terrs), ownedSet)));
 
   // Covenant ladders (AC #4, #6, #7): one per covenant in the viewer's list, and
   // NEVER a covenant outside it. Membership per covenantRowsFor: standing > 0 in
@@ -176,12 +218,13 @@ const router = express.Router();
 // failure returns a modelled 503 (matching characters.js / world.js), never a raw 500.
 router.get('/status', async (req, res) => {
   let characters;
+  let territories;
   try {
-    characters = await getCharacters();
+    [characters, territories] = await Promise.all([getCharacters(), getTerritories()]);
   } catch {
     return res.status(503).json({ error: 'STORE_ERROR', message: 'Status data temporarily unavailable' });
   }
-  res.json(buildStatusView(characters, req.user));
+  res.json(buildStatusView(characters, territories, req.user));
 });
 
 export default router;

@@ -27,17 +27,22 @@
 
 import express from 'express';
 import { getCharacters, getDossiers } from '../mongo-store.js';
+import { isSuperViewer } from '../access.js';
 
-// The eight summary-tier fields, fixed in specs/architecture.md → "Character
+// The seven summary-tier fields, fixed in specs/architecture.md → "Character
 // dossier field whitelist". `_id` is always added alongside (needed to link to
 // the profile); it is NOT one of these editorial fields.
+//
+// `bloodline` was REMOVED from this whitelist 2026-07-18 (Angelus's explicit
+// call: bloodline is hidden information, not public like clan/covenant). It
+// is now owner-only, same as attributes/skills/etc - simply not naming it
+// here is the entire enforcement (allowlist, not denylist).
 export const SUMMARY_FIELDS = Object.freeze([
   'name',
   'honorific',
   'moniker',
   'clan',
   'covenant',
-  'bloodline',
   'apparent_age',
   'retired',
 ]);
@@ -103,9 +108,15 @@ export function factsForCharacter(dossiers, character) {
 //     subset of facts allowed by filterFactsForViewer.
 // `tier` is included so the frontend knows which shape it received (it is not a
 // secret and does not widen either channel).
+//
+// The named-ST superviewer (Story 3.3, access.js) receives the OWNER tier for
+// EVERY character — the same full-sight override applied on the owner path, so
+// the frontend renders it through the existing owner shape with no new branch.
+// The gate is fail-closed (role 'st' AND allowlisted id); every other viewer,
+// including another ST, still runs the owner-vs-summary decision below.
 export function projectCharacterForViewer(character, facts, viewer) {
   const ownFacts = Array.isArray(facts) ? facts : [];
-  if (isOwner(character, viewer)) {
+  if (isSuperViewer(viewer) || isOwner(character, viewer)) {
     return { ...character, tier: 'owner', facts: ownFacts };
   }
   const summary = summariseCharacter(character);
@@ -135,8 +146,13 @@ router.get('/characters', async (req, res) => {
   } catch {
     return res.status(503).json({ error: 'STORE_ERROR', message: 'Character data temporarily unavailable' });
   }
+  // Retired characters are hidden from the roster for normal viewers, but the
+  // named-ST superviewer (Story 3.3) sees them too so every character is
+  // reachable from the list. Entries stay summary-shaped either way (the full
+  // dossier is fetched per-character on the profile route).
+  const superviewer = isSuperViewer(req.user);
   const list = characters
-    .filter((c) => !c.retired)
+    .filter((c) => superviewer || !c.retired)
     .map(summariseCharacter)
     .sort((a, b) => sortNameKey(a).localeCompare(sortNameKey(b)));
   res.json({ characters: list });

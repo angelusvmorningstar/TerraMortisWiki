@@ -82,6 +82,11 @@ const CHAR_C = {
   ...sheet(),
 };
 
+// The one named-ST superviewer (Story 3.3) - role 'st' AND an allowlisted id,
+// owns no character.
+const SUPERVIEWER_ID = '694104767298797618';
+const SUPERVIEWER = { id: SUPERVIEWER_ID, role: 'st', character_ids: [] };
+
 const TEST_PLAYERS = [
   { discord_id: '111', role: 'player', character_ids: ['charA'], discord_username: 'ambrose_pc' },
   { discord_id: '222', role: 'player', character_ids: ['charB'], discord_username: 'bea_pc' },
@@ -89,11 +94,12 @@ const TEST_PLAYERS = [
   { discord_id: '444', role: 'player', character_ids: ['charD'], discord_username: 'doc_pc' },
   { discord_id: '999', role: 'player', character_ids: ['charA', 'charB'], discord_username: 'multi_pc' },
   { discord_id: '000', role: 'player', character_ids: [], discord_username: 'spectator_pc' },
+  { discord_id: SUPERVIEWER_ID, role: 'st', character_ids: [], discord_username: 'a_morningstar' },
 ];
 const TEST_CHARACTERS = [CHAR_B, CHAR_A, CHAR_D, CHAR_C]; // deliberately unsorted
 
-function makeFakeDb({ players = [], characters = [] } = {}) {
-  const data = { players, characters };
+function makeFakeDb({ players = [], characters = [], territories = [] } = {}) {
+  const data = { players, characters, territories };
   return {
     collection(name) {
       const docs = data[name] ?? [];
@@ -102,8 +108,8 @@ function makeFakeDb({ players = [], characters = [] } = {}) {
   };
 }
 
-function installTestDb() {
-  setTestDb(makeFakeDb({ players: TEST_PLAYERS, characters: TEST_CHARACTERS }));
+function installTestDb(overrides = {}) {
+  setTestDb(makeFakeDb({ players: TEST_PLAYERS, characters: TEST_CHARACTERS, territories: [], ...overrides }));
 }
 
 // --- Discord mock (mirrors characters.test.js) ------------------------------
@@ -166,21 +172,21 @@ function allRows(view) {
 
 test('AC #4/#8: covenant list = primary UNION status>0, primary-first, de-duplicated', () => {
   // A single-covenant owner (charA): just Invictus.
-  const vA = buildStatusView(TEST_CHARACTERS, { character_ids: ['charA'] });
+  const vA = buildStatusView(TEST_CHARACTERS, [], { character_ids: ['charA'] });
   assert.deepEqual(vA.covenant.ladders.map((l) => l.name), ['Invictus']);
   // B holds primary Circle of the Crone PLUS standing 2 in Invictus -> both, primary first.
-  const vB = buildStatusView(TEST_CHARACTERS, { character_ids: ['charB'] });
+  const vB = buildStatusView(TEST_CHARACTERS, [], { character_ids: ['charB'] });
   assert.deepEqual(vB.covenant.ladders.map((l) => l.name), ['Circle of the Crone', 'Invictus']);
 });
 
 test('AC #5/#8: clan set = the owned characters clan values, de-duplicated', () => {
-  const vA = buildStatusView(TEST_CHARACTERS, { character_ids: ['charA'] });
+  const vA = buildStatusView(TEST_CHARACTERS, [], { character_ids: ['charA'] });
   assert.deepEqual(vA.clan.ladders.map((l) => l.name), ['Ventrue']);
 });
 
 test('AC #8: multi-character owner UNIONs covenant list and clan set (no length-1 special-casing)', () => {
   // owns A (Invictus/Ventrue) and B (Circle of the Crone/Mekhet, +Invictus standing).
-  const v = buildStatusView(TEST_CHARACTERS, { character_ids: ['charA', 'charB'] });
+  const v = buildStatusView(TEST_CHARACTERS, [], { character_ids: ['charA', 'charB'] });
   // covenant union across both owned characters (order follows the store, so
   // assert as a set): A's primary Invictus + B's primary Circle of the Crone
   // (B's Invictus standing de-duplicates against A's primary).
@@ -192,7 +198,7 @@ test('AC #8: multi-character owner UNIONs covenant list and clan set (no length-
 });
 
 test('AC #6: covenant ladder membership = standing>0 OR primary; sorted value desc then sortName', () => {
-  const v = buildStatusView(TEST_CHARACTERS, { character_ids: ['charA'] });
+  const v = buildStatusView(TEST_CHARACTERS, [], { character_ids: ['charA'] });
   const invictus = v.covenant.ladders.find((l) => l.name === 'Invictus');
   // charA (primary Invictus, value 5) and charB (Invictus standing 2) - sorted desc.
   assert.deepEqual(invictus.rows.map((r) => r._id), ['charA', 'charB']);
@@ -200,7 +206,7 @@ test('AC #6: covenant ladder membership = standing>0 OR primary; sorted value de
 });
 
 test('AC #6: clan ladder membership = same clan; value = status.clan||0; sorted value desc', () => {
-  const v = buildStatusView(TEST_CHARACTERS, { character_ids: ['charA'] });
+  const v = buildStatusView(TEST_CHARACTERS, [], { character_ids: ['charA'] });
   const ventrue = v.clan.ladders.find((l) => l.name === 'Ventrue');
   // charA (clan status 2) and charD (clan status 1) - same clan Ventrue.
   assert.deepEqual(ventrue.rows.map((r) => r._id), ['charA', 'charD']);
@@ -211,7 +217,7 @@ test('AC #7 [LEAK-GATE]: per-ladder SCALAR isolation - a multi-covenant characte
   // Viewer A sees the Invictus ladder. B holds standing in BOTH Invictus (2) and
   // Circle of the Crone (4). In A's Invictus ladder, B's row must carry value 2
   // and NOTHING that reveals the Circle-of-the-Crone standing.
-  const v = buildStatusView(TEST_CHARACTERS, { character_ids: ['charA'] });
+  const v = buildStatusView(TEST_CHARACTERS, [], { character_ids: ['charA'] });
   const invictus = v.covenant.ladders.find((l) => l.name === 'Invictus');
   const bRow = invictus.rows.find((r) => r._id === 'charB');
   assert.equal(bRow.value, 2, 'B exposes ONLY its Invictus scalar in the Invictus ladder');
@@ -223,7 +229,7 @@ test('AC #7 [LEAK-GATE]: per-ladder SCALAR isolation - a multi-covenant characte
 });
 
 test('AC #7 [LEAK-GATE]: every row is allowlist-constructed - no owner-only field, no status sub-document', () => {
-  const v = buildStatusView(TEST_CHARACTERS, { character_ids: ['charA', 'charB'] });
+  const v = buildStatusView(TEST_CHARACTERS, [], { character_ids: ['charA', 'charB'] });
   for (const row of allRows(v)) {
     for (const k of Object.keys(row)) assert.ok(ROW_ALLOWED_KEYS.has(k), `unexpected row key ${k}`);
     for (const f of OWNER_ONLY_FIELDS) assert.ok(!(f in row), `row leaks owner-only field ${f}`);
@@ -231,19 +237,54 @@ test('AC #7 [LEAK-GATE]: every row is allowlist-constructed - no owner-only fiel
   }
 });
 
-test('AC #3/#10: City ladder is ungated (identical for every viewer) and shows RAW status.city', () => {
-  const vA = buildStatusView(TEST_CHARACTERS, { character_ids: ['charA'] });
-  const vSpectator = buildStatusView(TEST_CHARACTERS, { character_ids: [] });
-  // same rows, same order, same raw city values regardless of who is asking.
+test('AC #3: City ladder is ungated (identical for every viewer)', () => {
+  const vA = buildStatusView(TEST_CHARACTERS, [], { character_ids: ['charA'] });
+  const vSpectator = buildStatusView(TEST_CHARACTERS, [], { character_ids: [] });
+  // same rows, same order, same city values regardless of who is asking.
   assert.deepEqual(vA.city.rows.map((r) => r._id), vSpectator.city.rows.map((r) => r._id));
   assert.deepEqual(vA.city.rows.map((r) => r.value), vSpectator.city.rows.map((r) => r.value));
-  // raw stored status.city, sorted desc: A(6), B(4), D(3); retired C(9) excluded.
+  // no court_category on any fixture character, so effective == raw here: A(6), B(4), D(3); retired C(9) excluded.
   assert.deepEqual(vA.city.rows.map((r) => r._id), ['charA', 'charB', 'charD']);
   assert.deepEqual(vA.city.rows.map((r) => r.value), [6, 4, 3]);
 });
 
+test('City Status EFFECTIVE value: title bonus is added on top of the raw stored value', () => {
+  // charA: raw status.city 6, court_category Head of State (+3) -> 9.
+  const withTitle = { ...CHAR_A, court_category: 'Head of State' };
+  const v = buildStatusView([withTitle], [], { character_ids: ['charA'] });
+  assert.equal(v.city.rows.find((r) => r._id === 'charA').value, 9);
+});
+
+test('City Status EFFECTIVE value: regent ambience bonus is added, lieutenants get none', () => {
+  const territories = [
+    { _id: 't1', name: 'The Academy', ambience: 'Verdant', regent_id: 'charA', lieutenant_id: 'charB' },
+  ];
+  // charA (regent, raw 6) gets the Verdant +1 -> 7. charB (lieutenant, raw 4) gets NO ambience bonus, stays 4.
+  const v = buildStatusView([CHAR_A, CHAR_B], territories, { character_ids: ['charA'] });
+  assert.equal(v.city.rows.find((r) => r._id === 'charA').value, 7);
+  assert.equal(v.city.rows.find((r) => r._id === 'charB').value, 4);
+});
+
+test('City Status EFFECTIVE value: title + ambience bonuses stack and clamp at 10', () => {
+  const territories = [{ _id: 't1', name: 'The Academy', ambience: 'Verdant', regent_id: 'charA', lieutenant_id: null }];
+  // charA: raw 6 + Head of State (+3) + Verdant (+1) = 10, exactly the cap.
+  const withTitle = { ...CHAR_A, court_category: 'Head of State' };
+  const atCap = buildStatusView([withTitle], territories, { character_ids: ['charA'] });
+  assert.equal(atCap.city.rows[0].value, 10);
+  // a higher raw value would overshoot without the clamp - prove it doesn't.
+  const overshoot = { ...withTitle, status: { ...withTitle.status, city: 9 } }; // 9+3+1=13 uncapped
+  const capped = buildStatusView([overshoot], territories, { character_ids: ['charA'] });
+  assert.equal(capped.city.rows[0].value, 10, 'must clamp to 10, not report 13');
+});
+
+test('City Status EFFECTIVE value: an ambience not in the bonus map (e.g. Tended/Settled/Untended) adds nothing', () => {
+  const territories = [{ _id: 't1', name: 'The Harbour', ambience: 'Settled', regent_id: 'charA', lieutenant_id: null }];
+  const v = buildStatusView([CHAR_A], territories, { character_ids: ['charA'] });
+  assert.equal(v.city.rows[0].value, 6, 'Settled is not in REGENT_AMBIENCE_BONUS - no bonus applied');
+});
+
 test('AC #14: retired characters are excluded from ALL ladder rows', () => {
-  const v = buildStatusView(TEST_CHARACTERS, { character_ids: ['charA', 'charB'] });
+  const v = buildStatusView(TEST_CHARACTERS, [], { character_ids: ['charA', 'charB'] });
   for (const row of allRows(v)) assert.notEqual(row._id, 'charC', 'retired charC must never be a row');
 });
 
@@ -251,7 +292,7 @@ test('AC #14: a retired-only owner STILL sees their own faction ladders (populat
   // charC is retired and is player 333's only character. They still get the
   // Carthian Movement + Gangrel ladders derived from C, even though C itself is
   // excluded from the rows (so those ladders are honestly empty here).
-  const v = buildStatusView(TEST_CHARACTERS, { character_ids: ['charC'] });
+  const v = buildStatusView(TEST_CHARACTERS, [], { character_ids: ['charC'] });
   assert.deepEqual(v.covenant.ladders.map((l) => l.name), ['Carthian Movement']);
   assert.deepEqual(v.clan.ladders.map((l) => l.name), ['Gangrel']);
   // and C itself is not a row in them (retired excluded)
@@ -260,14 +301,53 @@ test('AC #14: a retired-only owner STILL sees their own faction ladders (populat
 });
 
 test('AC #9: fail-closed - a spectator (no character) gets City only, empty covenant + clan sections', () => {
-  const v = buildStatusView(TEST_CHARACTERS, { character_ids: [] });
+  const v = buildStatusView(TEST_CHARACTERS, [], { character_ids: [] });
   assert.ok(v.city.rows.length > 0, 'City is still fully public for a spectator');
   assert.deepEqual(v.covenant.ladders, []);
   assert.deepEqual(v.clan.ladders, []);
 });
 
+// --- Story 3.3: the named-ST superviewer full-sight override -----------------
+
+test('AC #3.3: superviewer receives EVERY covenant and clan ladder with a current member, despite owning nothing', () => {
+  const v = buildStatusView(TEST_CHARACTERS, [], SUPERVIEWER);
+  // every covenant/clan present in the ACTIVE roster (retired-only Carthian /
+  // Gangrel from charC are correctly absent - no current standing).
+  assert.deepEqual(v.covenant.ladders.map((l) => l.name).sort(), ['Circle of the Crone', 'Invictus', 'Lancea et Sanctum']);
+  assert.deepEqual(v.clan.ladders.map((l) => l.name).sort(), ['Mekhet', 'Ventrue']);
+  assert.ok(!v.covenant.ladders.some((l) => l.name === 'Carthian Movement'), 'retired-only Carthian must not appear');
+  assert.ok(!v.clan.ladders.some((l) => l.name === 'Gangrel'), 'retired-only Gangrel must not appear');
+  // the Lancea et Sanctum ladder - which normal viewer A (Invictus/Ventrue) never
+  // sees - is present for the superviewer, with charD at its scalar.
+  const les = v.covenant.ladders.find((l) => l.name === 'Lancea et Sanctum');
+  assert.deepEqual(les.rows.map((r) => r._id), ['charD']);
+  assert.deepEqual(les.rows.map((r) => r.value), [3]);
+});
+
+test('AC #3.3 [LEAK-GATE]: superviewer rows are STILL allowlist-constructed - no owner-only field, no status sub-document', () => {
+  // full sight widens WHICH ladders the viewer receives (channel 2), it does NOT
+  // relax the per-row allowlist (channels 1 and 3) - each row is still scalar-only.
+  const v = buildStatusView(TEST_CHARACTERS, [], SUPERVIEWER);
+  for (const row of allRows(v)) {
+    for (const k of Object.keys(row)) assert.ok(ROW_ALLOWED_KEYS.has(k), `unexpected row key ${k}`);
+    for (const f of OWNER_ONLY_FIELDS) assert.ok(!(f in row), `row leaks owner-only field ${f}`);
+    assert.ok(!('status' in row), 'row leaks the status sub-document');
+  }
+});
+
+test('AC #3.3 [fail-closed]: another ST, and the allowlisted id at role player, do NOT get full sight', () => {
+  // another genuine ST (id not allowlisted): owns nothing -> empty faction sections, exactly like a spectator.
+  const otherSt = buildStatusView(TEST_CHARACTERS, [], { id: '405594065841946624', role: 'st', character_ids: [] });
+  assert.deepEqual(otherSt.covenant.ladders, []);
+  assert.deepEqual(otherSt.clan.ladders, []);
+  // the allowlisted id demoted to player: normal owned-based gate (owns charA -> Invictus/Ventrue only).
+  const demoted = buildStatusView(TEST_CHARACTERS, [], { id: SUPERVIEWER_ID, role: 'player', character_ids: ['charA'] });
+  assert.deepEqual(demoted.covenant.ladders.map((l) => l.name), ['Invictus']);
+  assert.deepEqual(demoted.clan.ladders.map((l) => l.name), ['Ventrue']);
+});
+
 test('AC #8: the mine flag is per-row, true iff the row character is one of the viewer owned', () => {
-  const v = buildStatusView(TEST_CHARACTERS, { character_ids: ['charA'] });
+  const v = buildStatusView(TEST_CHARACTERS, [], { character_ids: ['charA'] });
   const aCity = v.city.rows.find((r) => r._id === 'charA');
   const bCity = v.city.rows.find((r) => r._id === 'charB');
   assert.equal(aCity.mine, true);
@@ -289,7 +369,7 @@ test('LEAK-GATE (discrimination): a naive passthrough WOULD leak; the real build
   assert.ok(passthroughBody.includes('"status"'), 'passthrough leaks the status sub-document (covenant map channel 3)');
 
   // The real assembly for the same viewer leaks NONE of them:
-  const realBody = JSON.stringify(buildStatusView(TEST_CHARACTERS, { character_ids: ['charA'] }));
+  const realBody = JSON.stringify(buildStatusView(TEST_CHARACTERS, [], { character_ids: ['charA'] }));
   for (const f of OWNER_ONLY_FIELDS) {
     assert.ok(!realBody.includes(`"${f}"`), `real assembly must not contain ${f}`);
   }
@@ -297,8 +377,8 @@ test('LEAK-GATE (discrimination): a naive passthrough WOULD leak; the real build
 });
 
 test('AC #8: buildStatusView tolerates empty/absent inputs without crashing', () => {
-  assert.deepEqual(buildStatusView([], { character_ids: ['charA'] }), { city: { rows: [] }, covenant: { ladders: [] }, clan: { ladders: [] } });
-  assert.deepEqual(buildStatusView(undefined, undefined), { city: { rows: [] }, covenant: { ladders: [] }, clan: { ladders: [] } });
+  assert.deepEqual(buildStatusView([], [], { character_ids: ['charA'] }), { city: { rows: [] }, covenant: { ladders: [] }, clan: { ladders: [] } });
+  assert.deepEqual(buildStatusView(undefined, undefined, undefined), { city: { rows: [] }, covenant: { ladders: [] }, clan: { ladders: [] } });
 });
 
 // ===========================================================================
@@ -348,6 +428,21 @@ test('AC #12 [LEAK-GATE]: multi-character union - a viewer owning two factions s
     assert.ok(!covNames.includes('Lancea et Sanctum') && !covNames.includes('Carthian Movement'));
     assert.ok(!clanNames.includes('Gangrel'));
     assert.ok(!rawBody.includes('"status"'), 'LEAK: status sub-document present in multi-char body');
+  });
+});
+
+test('AC #3.3 [HTTP]: superviewer receives every covenant + clan ladder, no status sub-document leak', async () => {
+  installTestDb();
+  await withServer(async (base) => {
+    const { status, rawBody, body } = await getAs(base, SUPERVIEWER_ID, '/api/status');
+    assert.equal(status, 200);
+    assert.deepEqual(body.covenant.ladders.map((l) => l.name).sort(), ['Circle of the Crone', 'Invictus', 'Lancea et Sanctum']);
+    assert.deepEqual(body.clan.ladders.map((l) => l.name).sort(), ['Mekhet', 'Ventrue']);
+    // channels 1 + 3 still airtight even at full ladder breadth
+    assert.ok(!rawBody.includes('"status"'), 'LEAK: status sub-document present in superviewer body');
+    for (const f of OWNER_ONLY_FIELDS) {
+      assert.ok(!rawBody.includes(`"${f}"`), `LEAK: owner-only field ${f} present in superviewer body`);
+    }
   });
 });
 

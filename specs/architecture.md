@@ -52,12 +52,14 @@ The API reads (read-only, per request, no caching layer beyond the auth token ca
 
 This is a fixed list, same shape for every character, decided in the roundtable (Option A, not ST-curated prose):
 - `name` (legal), `honorific`, `moniker` (i.e. however `displayName()` already resolves it in TM Suite)
-- `clan`, `covenant`, `bloodline`
+- `clan`, `covenant`
 - `apparent_age`
 - `retired` flag
 - Any `character_dossier.facts[]` entries where `st_hidden` is **not** true AND (see reveals, below) either the fact has no `revealed_to` restriction, or the current viewer's character is in it.
 
-Everything else on the character document (attributes, skills, disciplines, merits, XP, tracker state, secrets) is **owner-only** — visible solely when the viewer's `character_ids` includes this character's `_id`.
+`bloodline` was removed from this whitelist 2026-07-18 (Angelus's explicit call) — it is owner-only now, same as attributes/skills/etc.
+
+Everything else on the character document (attributes, skills, disciplines, merits, XP, tracker state, bloodline, secrets) is **owner-only** — visible solely when the viewer's `character_ids` includes this character's `_id`.
 
 ### Reveals — extend the existing fact schema, don't fork a new one
 
@@ -66,6 +68,10 @@ Everything else on the character document (attributes, skills, disciplines, meri
 - This field is **out of scope to build UI for** in v1. The schema supports it from day one; nothing in this app's routes needs to expose a way to *set* it.
 
 Territory/map-level reveals (the Homebush example is literally a territory, not a character fact) are v2, alongside the map itself — no schema decision needed for v1 beyond not blocking it later.
+
+### Storyteller superviewer carve-out (Story 3.3)
+
+A single named Storyteller (Angelus) sees **everything** the wiki holds — every character's full dossier (owner tier + all `st_hidden` facts, plus the retired roster) and every covenant/clan status ladder — mirroring the sight they already have in TM Suite. The gate lives in `server/access.js` (`isSuperViewer`) and is deliberately narrow and **fail-closed**: it requires `role === 'st'` **AND** a Discord id on an explicit allowlist. It is not "all Storytellers" (another genuine ST gets the normal per-viewer gate) and not "any elevated role" (`dev`/`coordinator` get nothing extra). Consumed only by the two per-viewer boundaries (`routes/characters.js` projection, `routes/status.js` ladder-list derivation); it widens **which** data the viewer receives (channel 2), never the per-row/field allowlists themselves (channels 1 and 3 stay airtight — the superviewer's status rows are still scalar-only, no `status` sub-document). `routes/st-map.js` is intentionally ST-wide already and does not use this narrower id gate.
 
 ### Lore content
 

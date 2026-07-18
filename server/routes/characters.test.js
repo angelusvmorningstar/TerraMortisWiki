@@ -33,7 +33,7 @@ const DISCORD_API = 'https://discord.com/api/v10';
 // --- Fixtures ---------------------------------------------------------------
 // Owner-only representative field set (AC #7): if ANY of these appears in a
 // cross-player response body, the gate has leaked.
-const OWNER_ONLY_FIELDS = ['attributes', 'skills', 'disciplines', 'merits', 'xp_log', 'tracker_state'];
+const OWNER_ONLY_FIELDS = ['attributes', 'skills', 'disciplines', 'merits', 'xp_log', 'tracker_state', 'bloodline'];
 
 // Character A — owned by player 111.
 const CHAR_A = {
@@ -108,10 +108,16 @@ const CHAR_C = {
 const A_PUBLIC_FACT = { tag: 'birthplace', value: 'London in 1650', source: 'history', st_hidden: false };
 const A_OWN_SECRET = { tag: 'secret', value: 'Ambrose is a secret Ordo Dracul agent', source: 'st', st_hidden: true, revealed_to: null };
 
+// The one named-ST superviewer (Story 3.3) - role 'st' AND an allowlisted id.
+// Owns NO character, to prove the full-sight override is independent of ownership.
+const SUPERVIEWER_ID = '694104767298797618';
+const SUPERVIEWER = { id: SUPERVIEWER_ID, role: 'st', character_ids: [] };
+
 const TEST_PLAYERS = [
   { discord_id: '111', role: 'player', character_ids: ['charA'], discord_username: 'ambrose_pc' },
   { discord_id: '222', role: 'player', character_ids: ['charB'], discord_username: 'bea_pc' },
   { discord_id: '333', role: 'player', character_ids: ['charC'], discord_username: 'caz_pc' },
+  { discord_id: SUPERVIEWER_ID, role: 'st', character_ids: [], discord_username: 'a_morningstar' },
 ];
 const TEST_CHARACTERS = [CHAR_B, CHAR_A, CHAR_C]; // deliberately unsorted
 const TEST_DOSSIERS = [
@@ -194,7 +200,7 @@ test('AC #4/#8: summariseCharacter builds a NEW object with ONLY the whitelist +
   // exactly the whitelist fields that are present, plus _id
   assert.deepEqual(
     Object.keys(s).sort(),
-    ['_id', 'apparent_age', 'bloodline', 'clan', 'covenant', 'honorific', 'moniker', 'name', 'retired'].sort(),
+    ['_id', 'apparent_age', 'clan', 'covenant', 'honorific', 'moniker', 'name', 'retired'].sort(),
   );
   // and NONE of the owner-only fields survived
   for (const f of OWNER_ONLY_FIELDS) assert.ok(!(f in s), `summary must not contain ${f}`);
@@ -202,18 +208,26 @@ test('AC #4/#8: summariseCharacter builds a NEW object with ONLY the whitelist +
   assert.notEqual(s, CHAR_B);
 });
 
-test('AC #4: SUMMARY_FIELDS is exactly the eight architecture-fixed fields', () => {
+test('AC #4: SUMMARY_FIELDS is exactly the seven architecture-fixed fields', () => {
   assert.deepEqual(
     [...SUMMARY_FIELDS].sort(),
-    ['apparent_age', 'bloodline', 'clan', 'covenant', 'honorific', 'moniker', 'name', 'retired'].sort(),
+    ['apparent_age', 'clan', 'covenant', 'honorific', 'moniker', 'name', 'retired'].sort(),
   );
 });
 
 test('AC #4: an absent whitelist field is omitted, never fabricated', () => {
-  const thin = { _id: 'x', name: 'Thin', clan: 'Nosferatu' }; // no honorific/bloodline/etc.
+  const thin = { _id: 'x', name: 'Thin', clan: 'Nosferatu' }; // no honorific/apparent_age/etc.
   const s = summariseCharacter(thin);
   assert.deepEqual(Object.keys(s).sort(), ['_id', 'clan', 'name']);
-  assert.ok(!('bloodline' in s) && !('honorific' in s));
+  assert.ok(!('honorific' in s) && !('apparent_age' in s));
+});
+
+test('[LEAK-GATE] bloodline is owner-only: never present in a non-owner summary, even when set on the source document', () => {
+  // CHAR_B carries a real bloodline ('Norvegi' - see fixtures above); confirm
+  // it does NOT survive summariseCharacter for a non-owner view.
+  const s = summariseCharacter(CHAR_B);
+  assert.ok(!('bloodline' in s), 'LEAK: bloodline present in the summary tier');
+  assert.ok(!SUMMARY_FIELDS.includes('bloodline'), 'LEAK: bloodline present in the allowlist itself');
 });
 
 test('AC #3/#8: isOwner is set membership over string-normalised ids (multi-character, no length-1 assumption)', () => {
@@ -266,6 +280,35 @@ test('AC #3/#4/#8: projectCharacterForViewer — summary tier strips owner-only 
   for (const f of OWNER_ONLY_FIELDS) assert.ok(!(f in out), `summary tier must NOT include ${f}`);
   assert.equal(out.name, 'Béatrice');
   assert.deepEqual(out.facts.map((f) => f.value), [B_PUBLIC_FACT.value]); // only the public fact for C
+});
+
+// --- Story 3.3: the named-ST superviewer full-sight override -----------------
+
+test('AC #3.3: superviewer gets OWNER tier (full doc + ALL facts incl st_hidden) for a character they do NOT own', () => {
+  const facts = [B_PUBLIC_FACT, B_SECRET_HIDDEN, B_SECRET_TO_A];
+  const out = projectCharacterForViewer(CHAR_B, facts, SUPERVIEWER);
+  assert.equal(out.tier, 'owner');
+  for (const f of OWNER_ONLY_FIELDS) assert.ok(f in out, `superviewer must see owner-only field ${f}`);
+  assert.equal(out.tracker_state.vitae, 11);
+  // every fact, including the never-revealed st_hidden secret and bloodline
+  assert.deepEqual(out.facts.map((f) => f.value), [B_PUBLIC_FACT.value, B_SECRET_HIDDEN.value, B_SECRET_TO_A.value]);
+  assert.equal(out.bloodline, 'Norvegi');
+});
+
+test('AC #3.3 [fail-closed, id-scoped]: another genuine ST still gets the SUMMARY tier — no leak', () => {
+  const facts = [B_PUBLIC_FACT, B_SECRET_HIDDEN, B_SECRET_TO_A];
+  const otherSt = { id: '405594065841946624', role: 'st', character_ids: [] }; // Symon, a real ST, not on the allowlist
+  const out = projectCharacterForViewer(CHAR_B, facts, otherSt);
+  for (const f of OWNER_ONLY_FIELDS) assert.ok(!(f in out), `non-superviewer ST must NOT see ${f}`);
+  assert.deepEqual(out.facts.map((f) => f.value), [B_PUBLIC_FACT.value]); // public only
+});
+
+test('AC #3.3 [fail-closed, role-scoped]: the allowlisted id at role player gets the SUMMARY tier', () => {
+  const facts = [B_PUBLIC_FACT, B_SECRET_HIDDEN, B_SECRET_TO_A];
+  const demoted = { id: SUPERVIEWER_ID, role: 'player', character_ids: [] };
+  const out = projectCharacterForViewer(CHAR_B, facts, demoted);
+  for (const f of OWNER_ONLY_FIELDS) assert.ok(!(f in out), `demoted allowlisted id must NOT see ${f}`);
+  assert.deepEqual(out.facts.map((f) => f.value), [B_PUBLIC_FACT.value]);
 });
 
 // --- The discrimination proof (negative control) ---------------------------
@@ -379,6 +422,29 @@ test('retired characters are excluded from the roster list (charC is retired)', 
   await withServer(async (base) => {
     const { body } = await getAs(base, '111', '/api/characters');
     assert.ok(!body.characters.some((c) => c._id === 'charC'), 'retired character charC must not appear in the list');
+  });
+});
+
+test('AC #3.3 [HTTP]: superviewer sees a full dossier + every st_hidden fact for a character they do NOT own', async () => {
+  installTestDb();
+  await withServer(async (base) => {
+    const { status, rawBody, body } = await getAs(base, SUPERVIEWER_ID, '/api/characters/charB');
+    assert.equal(status, 200);
+    const c = body.character;
+    for (const f of OWNER_ONLY_FIELDS) assert.ok(f in c, `superviewer must see owner-only field ${f}`);
+    assert.ok(rawBody.includes(B_SECRET_HIDDEN.value), 'superviewer must see the never-revealed st_hidden secret');
+    assert.deepEqual(c.facts.map((f) => f.value), [B_PUBLIC_FACT.value, B_SECRET_HIDDEN.value, B_SECRET_TO_A.value]);
+  });
+});
+
+test('AC #3.3 [HTTP]: the roster list includes retired characters for the superviewer only', async () => {
+  installTestDb();
+  await withServer(async (base) => {
+    const asSuper = await getAs(base, SUPERVIEWER_ID, '/api/characters');
+    assert.ok(asSuper.body.characters.some((c) => c._id === 'charC'), 'superviewer roster must include retired charC');
+    // and a normal player still does not see it (the widening is superviewer-only)
+    const asPlayer = await getAs(base, '111', '/api/characters');
+    assert.ok(!asPlayer.body.characters.some((c) => c._id === 'charC'), 'retired charC must stay hidden from a normal player');
   });
 });
 
