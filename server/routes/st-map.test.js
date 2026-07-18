@@ -60,8 +60,11 @@ const TEST_CHARACTERS = [
   { _id: 'charDoc', name: 'Doc' }, // resident of nothing
 ];
 
+// Must match access.js SUPERVIEWER_DISCORD_IDS. Only this id + role 'st' sees everything.
+const SUPERVIEWER_ID = '694104767298797618';
 const TEST_PLAYERS = [
-  { discord_id: '111', role: 'st', character_ids: [], discord_username: 'st_user' },
+  { discord_id: SUPERVIEWER_ID, role: 'st', character_ids: [], discord_username: 'angelus' }, // head ST / superviewer -> sees all
+  { discord_id: '111', role: 'st', character_ids: ['charCarver'], discord_username: 'co_st' }, // co-ST playing a PC -> map-gated like a player
   { discord_id: '222', role: 'player', character_ids: ['charAlice'], discord_username: 'alice_pc' },
   { discord_id: '333', role: 'player', character_ids: ['charCarver'], discord_username: 'carver_pc' },
   { discord_id: '444', role: 'player', character_ids: ['charDoc'], discord_username: 'doc_pc' },
@@ -141,13 +144,21 @@ test('isSt: exactly role "st" passes, everything else (including dev/coordinator
   assert.equal(isSt({}), false);
 });
 
-test('buildStMapView: an ST viewer gets EVERY location, allowlist-projected', () => {
-  const v = buildStMapView(TEST_LOCATIONS, TEST_CHARACTERS, { role: 'st' });
+test('buildStMapView: a SUPERVIEWER (role st + allowlisted id) gets EVERY location, allowlist-projected', () => {
+  const v = buildStMapView(TEST_LOCATIONS, TEST_CHARACTERS, { role: 'st', id: SUPERVIEWER_ID });
   assert.equal(v.locations.length, 3);
   for (const row of v.locations) {
     for (const k of Object.keys(row)) assert.ok(ALLOWED_KEYS.has(k), `unexpected row key ${k}`);
     for (const f of INTERNAL_FIELDS) assert.ok(!(f in row), `row leaks internal field ${f}`);
   }
+});
+
+test('buildStMapView: a NON-superviewer ST (role st, id not on allowlist) is gated like a player', () => {
+  // A co-ST who plays a PC: map secrets stay hidden from their character.
+  const v = buildStMapView(TEST_LOCATIONS, TEST_CHARACTERS, { role: 'st', id: '111', character_ids: ['charCarver'] });
+  assert.deepEqual(v.locations.map((l) => l.name), ['The Sanctum'], 'no ST-wide map sight from role alone');
+  // role st with NO id (or wrong id) is not a superviewer either - fail closed.
+  assert.deepEqual(buildStMapView(TEST_LOCATIONS, TEST_CHARACTERS, { role: 'st', character_ids: [] }).locations, []);
 });
 
 test('buildStMapView [LEAK-GATE]: a resident sees ONLY their own haven, nothing else', () => {
@@ -187,7 +198,7 @@ test('buildStMapView: resident resolution is EXACT name match only, no trim/case
 });
 
 test('buildStMapView tolerates empty/absent inputs without crashing', () => {
-  assert.deepEqual(buildStMapView([], [], { role: 'st' }), { locations: [] });
+  assert.deepEqual(buildStMapView([], [], { role: 'st', id: SUPERVIEWER_ID }), { locations: [] });
   assert.deepEqual(buildStMapView(undefined, undefined, undefined), { locations: [] });
 });
 
@@ -197,7 +208,7 @@ test('LEAK-GATE (discrimination): a naive passthrough WOULD leak internal fields
   for (const f of INTERNAL_FIELDS) {
     assert.ok(passthroughBody.includes(`"${f}"`), `passthrough leaks internal field ${f}`);
   }
-  const realBody = JSON.stringify(buildStMapView(TEST_LOCATIONS, TEST_CHARACTERS, { role: 'st' }));
+  const realBody = JSON.stringify(buildStMapView(TEST_LOCATIONS, TEST_CHARACTERS, { role: 'st', id: SUPERVIEWER_ID }));
   for (const f of INTERNAL_FIELDS) {
     assert.ok(!realBody.includes(`"${f}"`), `real assembly must not contain ${f}`);
   }
@@ -207,16 +218,27 @@ test('LEAK-GATE (discrimination): a naive passthrough WOULD leak internal fields
 // HTTP-LEVEL [LEAK-GATE] TESTS
 // ===========================================================================
 
-test('AC [LEAK-GATE]: an ST viewer gets 200 with every location including non-haven ones', async () => {
+test('AC [LEAK-GATE]: a SUPERVIEWER gets 200 with every location including non-haven ones', async () => {
   installTestDb();
   await withServer(async (base) => {
-    const { status, rawBody, body } = await getAs(base, '111', '/api/st-map/locations');
+    const { status, rawBody, body } = await getAs(base, SUPERVIEWER_ID, '/api/st-map/locations');
     assert.equal(status, 200);
     assert.equal(body.locations.length, 3);
     assert.ok(body.locations.some((l) => l.name === 'Cumberland Reach'));
     for (const f of INTERNAL_FIELDS) {
       assert.ok(!rawBody.includes(`"${f}"`), `LEAK: internal field ${f} present in st-map body`);
     }
+  });
+});
+
+test('AC [LEAK-GATE]: a co-ST (role st, NOT on the superviewer allowlist) is map-gated as a player', async () => {
+  installTestDb();
+  await withServer(async (base) => {
+    const { status, body, rawBody } = await getAs(base, '111', '/api/st-map/locations');
+    assert.equal(status, 200);
+    assert.deepEqual(body.locations.map((l) => l.name), ['The Sanctum'], 'co-ST sees only their own haven');
+    assert.ok(!rawBody.includes('Cumberland Reach'), 'LEAK: werewolf zone visible to a non-superviewer ST');
+    assert.ok(!rawBody.includes('The Mansion'), 'LEAK: another haven visible to a non-superviewer ST');
   });
 });
 

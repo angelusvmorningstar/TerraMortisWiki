@@ -10,10 +10,15 @@
 //
 // TWO visibility rules, evaluated PER LOCATION (this is no longer a single
 // all-or-nothing gate for the whole route):
-//   1. role === 'st' sees EVERYTHING.
-//   2. Any other authenticated viewer sees ONLY a haven (faction === 'haven')
-//      where one of their OWNED characters is a resident - werewolf/mage/
-//      changeling/ghost/hq locations stay ST-only regardless of ownership.
+//   1. A SUPERVIEWER (head ST on the access.js allowlist) sees EVERYTHING.
+//      Plain role === 'st' is NOT enough: a co-ST whose character is in play
+//      (e.g. Keeper) is deliberately gated as a player here, so map secrets stay
+//      hidden from their character. Changed 2026-07-18, reversing the earlier
+//      ST-wide call.
+//   2. Any other authenticated viewer (INCLUDING a non-superviewer ST) sees ONLY
+//      a haven where one of their OWNED characters is a resident, plus any
+//      location whose revealed_to lists one of their characters - everything else
+//      stays hidden regardless of ownership.
 // A player who lives nowhere mapped gets a 200 with an empty array, not a
 // 403 - the route itself is now legitimately reachable by any player, so a
 // blanket "you don't get to know this exists" 403 no longer applies (that
@@ -44,6 +49,7 @@
 
 import express from 'express';
 import { getStMapLocations, getCharacters } from '../mongo-store.js';
+import { isSuperViewer } from '../access.js';
 
 // The location display allowlist. Covers BOTH document shapes seen in
 // st_map_locations: zone/territory-style (layer/real_place/centroid/polygon/
@@ -55,9 +61,10 @@ export const LOCATION_FIELDS = Object.freeze([
   'address', 'lat', 'lon', 'dots', 'resident_names',
 ]);
 
-// Role gate: exactly 'st', nothing else. 'dev' and 'coordinator' are
-// deliberately NOT included - Angelus's explicit call (2026-07-18) is the
-// narrowest gate, not "every non-player role".
+// Helper: true iff role is exactly 'st'. NOTE: this is no longer the map's
+// full-view gate - the route now gates full sight on isSuperViewer (role 'st'
+// AND the access.js id allowlist), so a co-ST playing a PC is player-gated here.
+// Kept as an exported helper.
 export function isSt(viewer) {
   return viewer?.role === 'st';
 }
@@ -104,7 +111,7 @@ function isRevealedTo(location, ownedSet) {
 export function buildStMapView(locations, characters, viewer) {
   const locs = Array.isArray(locations) ? locations : [];
   const chars = Array.isArray(characters) ? characters : [];
-  const st = isSt(viewer);
+  const st = isSuperViewer(viewer);
 
   const nameToId = new Map(chars.filter((c) => c && c.name).map((c) => [c.name, String(c._id)]));
   const ownedSet = ownedIdSet(viewer);

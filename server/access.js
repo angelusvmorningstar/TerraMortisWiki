@@ -8,11 +8,12 @@
 // below. BOTH conditions are required (fail-closed): a downgraded role, or any
 // other id (including another genuine ST), gets the normal per-viewer gate.
 //
-// Consumed by the two per-viewer authorisation boundaries (routes/characters.js,
-// routes/status.js). routes/st-map.js already grants role === 'st' full sight and
-// is intentionally ST-WIDE there (Angelus's 2026-07-18 call), so it does not use
-// this narrower id gate. See specs/architecture.md -> "Storyteller superviewer
-// carve-out".
+// Consumed by the THREE per-viewer authorisation boundaries (routes/characters.js,
+// routes/status.js, routes/st-map.js). st-map originally granted role === 'st'
+// full sight (ST-wide), but was moved onto this narrower id gate on 2026-07-18 so
+// a co-ST whose character is in play (e.g. Keeper) is map-gated as a player and
+// map secrets stay hidden from their character. See specs/architecture.md ->
+// "Storyteller superviewer carve-out".
 //
 // ALLOWLIST, NOT DENYLIST, and the SAME string-normalisation discipline the rest
 // of the repo uses on ids: an ObjectId/string/number mismatch can neither
