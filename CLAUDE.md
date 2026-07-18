@@ -18,8 +18,8 @@ Full product/architecture decisions are recorded in `specs/prd.md`, `specs/archi
 
 ### Core shape (see specs/architecture.md for detail)
 
-1. A **snapshot script**, run on command from the TM Suite dev environment (`server/scripts/` in that repo, or a script here that points at the same Mongo URI) — reads `tm_suite` collections once, writes a JSON snapshot into this repo, committed and pushed like any other change.
-2. A **thin Express service** — Discord OAuth (reusing TM Suite's OAuth app/credentials), gates the whole site, serves per-viewer-projected views computed from the in-memory snapshot. It never holds a Mongo connection.
+1. A **live, read-only Mongo client** (`server/mongo-store.js`): the deployed service reads the `tm_suite` collections directly (with a short in-memory cache), read-only both ways (belt: zero write calls, lexically tested; braces: a read-only Atlas DB user). This replaced the original committed-JSON-snapshot design in Story 1.2 rev 2. See `specs/architecture.md` "Shape (revised, live reads, not a snapshot)".
+2. A **thin Express service** (Discord OAuth, reusing TM Suite's OAuth app/credentials) gates the whole site and serves per-viewer-projected views. It holds the app's single read-only Mongo connection; nothing else touches `tm_suite`.
 3. **CSS**: reuse TM Suite's normalised design tokens (`public/css/theme.css`, `public/css/components.css` in `../TM Suite`) rather than inventing a new visual language. Port the tokens/components actually needed, don't duplicate the whole stylesheet blind.
 
 ### v1 scope

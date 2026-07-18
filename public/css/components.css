@@ -949,11 +949,6 @@ a.roster-row:hover { background: var(--surf2); }
   overflow: hidden;
 }
 
-.tier--mine {
-  border-color: var(--accent);
-  background: var(--gold-a8);
-}
-
 .tier__head {
   display: flex;
   align-items: center;
