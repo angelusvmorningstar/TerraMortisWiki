@@ -97,16 +97,26 @@ async function init() {
 
   map.fitBounds(layer.getBounds(), { padding: [24, 24] });
 
-  // Own-haven markers. The server route (/api/st-map/locations) already filters per viewer — a
-  // player gets back only havens their own character lives in; the ST gets all — so the map just
-  // renders whatever comes back. No client-side auth logic here, by design.
-  loadOwnHavens(map);
+  // Viewer-scoped layer. The server route (/api/st-map/locations) already filters per viewer — a
+  // player gets back only their own havens plus any territories the ST has revealed to them; the
+  // ST gets everything — so the map just renders whatever comes back. No client-side auth here.
+  loadViewerLocations(map);
 }
 
-// Fetch the viewer-scoped locations and draw any havens as oxblood circles (map key: circle =
-// home/safe place, oxblood = personal vampire). Fail-soft: any error just means no haven layer,
-// and the rest of the map is unaffected.
-async function loadOwnHavens(map) {
+// Splat palette for revealed territories — matches the shared map key (colour = splat, and a
+// per-splat dash pattern as the colour-independent second channel).
+const REVEAL_SPLAT = {
+  werewolf: { color: '#c0742a', dash: '10 6' },
+  mage: { color: '#34827b', dash: '3 8' },
+  changeling: { color: '#326638', dash: '14 5 3 5' },
+  geist: { color: '#26306b', dash: '20 8' },
+  ghost: { color: '#3a3a42', dash: '1 4' },
+};
+
+// Fetch the viewer-scoped locations and draw them: the viewer's own havens as oxblood circles
+// (map key: circle = home, oxblood = personal vampire), and any ST-revealed territories as their
+// splat-coloured polygon. Fail-soft: any error just means no extra layer, rest of the map is fine.
+async function loadViewerLocations(map) {
   let data;
   try {
     const res = await fetch('/api/st-map/locations');
@@ -116,26 +126,47 @@ async function loadOwnHavens(map) {
     return;
   }
   const locs = Array.isArray(data && data.locations) ? data.locations : [];
-  const havens = locs.filter(
-    (l) => l.faction === 'haven' && Number.isFinite(l.lat) && Number.isFinite(l.lon),
-  );
-  if (!havens.length) return;
+  if (!locs.length) return;
   const group = L.layerGroup();
-  havens.forEach((h) => {
-    const marker = L.circleMarker([h.lat, h.lon], {
-      radius: 6,
-      color: '#fff',
-      weight: 1.5,
-      fillColor: '#6e1f22',
-      fillOpacity: 0.95,
-    });
-    let body = `<strong>${esc(h.name || 'Haven')}</strong>`;
-    if (Array.isArray(h.resident_names) && h.resident_names.length) {
-      body += `<br>${esc(h.resident_names.join(', '))}`;
+  locs.forEach((l) => {
+    if (Array.isArray(l.polygon) && l.polygon.length) {
+      // Revealed territory. Stored polygon is [lon, lat] pairs; Leaflet wants [lat, lon].
+      const ring = l.polygon.map((pt) => [pt[1], pt[0]]);
+      const splat = REVEAL_SPLAT[l.faction] || { color: l.color || '#888', dash: null };
+      const poly = L.polygon(ring, {
+        color: splat.color,
+        weight: 2,
+        opacity: 0.9,
+        fillColor: splat.color,
+        fillOpacity: 0.3,
+        dashArray: splat.dash,
+      });
+      let body = `<strong>${esc(l.name || 'Territory')}</strong>`;
+      if (l.faction) body += `<br><em>${esc(l.faction)} territory</em>`;
+      poly.bindPopup(body);
+      poly.bindTooltip(esc(l.name || ''), {
+        permanent: true,
+        direction: 'center',
+        className: 'terr-label',
+        interactive: false,
+      });
+      group.addLayer(poly);
+    } else if (l.faction === 'haven' && Number.isFinite(l.lat) && Number.isFinite(l.lon)) {
+      const marker = L.circleMarker([l.lat, l.lon], {
+        radius: 6,
+        color: '#fff',
+        weight: 1.5,
+        fillColor: '#6e1f22',
+        fillOpacity: 0.95,
+      });
+      let body = `<strong>${esc(l.name || 'Haven')}</strong>`;
+      if (Array.isArray(l.resident_names) && l.resident_names.length) {
+        body += `<br>${esc(l.resident_names.join(', '))}`;
+      }
+      if (l.address) body += `<br><em>${esc(l.address)}</em>`;
+      marker.bindPopup(body);
+      group.addLayer(marker);
     }
-    if (h.address) body += `<br><em>${esc(h.address)}</em>`;
-    marker.bindPopup(body);
-    group.addLayer(marker);
   });
   group.addTo(map);
 }

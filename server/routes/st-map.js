@@ -88,6 +88,15 @@ function isResidentOf(location, nameToId, ownedSet) {
   });
 }
 
+// True iff the viewer owns a character explicitly listed in this location's `revealed_to`
+// array - the ST hand-revealing a specific territory/site to specific characters. String-
+// normalised. `revealed_to` is filter-only: it is NOT in LOCATION_FIELDS, so the id list
+// never reaches the client, only the fact that the location is visible.
+function isRevealedTo(location, ownedSet) {
+  const ids = Array.isArray(location.revealed_to) ? location.revealed_to : [];
+  return ids.some((id) => ownedSet.has(String(id)));
+}
+
 // The pure assembly: given the full st_map_locations array, the full
 // characters array (needed only to resolve haven residents by name), and the
 // viewer, return the per-location-filtered, allowlist-projected view. Mirrors
@@ -102,7 +111,8 @@ export function buildStMapView(locations, characters, viewer) {
 
   const visible = locs.filter((loc) => {
     if (st) return true;
-    return loc.faction === 'haven' && isResidentOf(loc, nameToId, ownedSet);
+    if (loc.faction === 'haven' && isResidentOf(loc, nameToId, ownedSet)) return true;
+    return isRevealedTo(loc, ownedSet);
   });
 
   return { locations: visible.map(stMapRow) };
