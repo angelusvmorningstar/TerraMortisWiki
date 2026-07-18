@@ -974,6 +974,18 @@ a.roster-row:hover { background: var(--surf2); }
   color: var(--txt3);
 }
 
+/* City Status tier appellation (Honoured, Admired, ...) - only City Status has
+   named tiers; Covenant/Clan stay plain numeric. */
+.tier__appellation {
+  font-family: var(--fh);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-left: 0.3rem;
+}
+
 .tier__chips {
   display: flex;
   flex-wrap: wrap;

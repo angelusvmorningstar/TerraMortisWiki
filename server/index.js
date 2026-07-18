@@ -22,6 +22,7 @@ import authRouter from './routes/auth.js';
 import charactersRouter from './routes/characters.js';
 import worldRouter from './routes/world.js';
 import statusRouter from './routes/status.js';
+import stMapRouter from './routes/st-map.js';
 import loreRouter from './routes/lore.js';
 import { requireAuth } from './middleware/auth.js';
 
@@ -91,6 +92,14 @@ export function createApp() {
   // receives are gated server-side in buildStatusView BEFORE the response leaves
   // Express, so no faction's internal standing reaches a viewer outside it.
   app.use('/api', statusRouter);
+
+  // ST + resident-gated map locations router (incident follow-up, 2026-07-18).
+  // Mounted AFTER the auth gate, alongside the other content routers. The THIRD
+  // access-control boundary in the repo. Role 'st' sees everything; any other
+  // viewer sees ONLY a haven where they own a listed resident, and nothing else
+  // (no other haven, no werewolf/mage/changeling/ghost/hq location). See
+  // st-map.js's header for the full threat model and resident-resolution rules.
+  app.use('/api', stMapRouter);
 
   // Lore router (Story 2.3). Mounted AFTER the auth gate, alongside the characters
   // and world routers. It reads NO Mongo and issues NO writes — its only I/O is

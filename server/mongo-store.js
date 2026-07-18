@@ -40,6 +40,10 @@ export async function getDossiers() {
   return getCollection('character_dossier').find({}).toArray();
 }
 
+export async function getStMapLocations() {
+  return getCollection('st_map_locations').find({}).toArray();
+}
+
 export async function getTerritories() {
   return getCollection('territories').find({}).toArray();
 }

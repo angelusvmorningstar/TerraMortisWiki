@@ -16,6 +16,14 @@ import { esc, cardName } from '../data/display.js';
 const rootEl = document.getElementById('status-root');
 const status = document.getElementById('status');
 
+// City Status tier appellations - ported verbatim from ../TM Suite/public/js/
+// data/constants.js's CITY_STATUS_APPELLATIONS. Covenant/Clan status have no
+// such named tiers in TM Suite - plain numeric dots only, unchanged.
+const CITY_STATUS_APPELLATIONS = {
+  1: 'Acknowledged', 2: 'Recognised', 3: 'Valued', 4: 'Respected', 5: 'Admired',
+  6: 'Honoured', 7: 'Revered', 8: 'Venerated', 9: 'Glorified', 10: 'Exalted',
+};
+
 function showStatus(message, isError) {
   status.textContent = message;
   status.hidden = false;
@@ -53,19 +61,21 @@ function chipHtml(row) {
   return `<span class="tier-chip${meClass}">${esc(cardName(row))}</span>`;
 }
 
-function tierHtml(tier, dotMax) {
+function tierHtml(tier, dotMax, appellations) {
+  const label = appellations?.[tier.value];
   return `
     <div class="tier">
       <div class="tier__head">
         <span class="tier__dots">${dotsHtml(tier.value, dotMax)}</span>
         <span class="tier__val">${tier.value}</span>
+        ${label ? `<span class="tier__appellation">${esc(label)}</span>` : ''}
       </div>
       <div class="tier__chips">${tier.rows.map(chipHtml).join('')}</div>
     </div>`;
 }
 
-function laddersBodyHtml(rows, dotMax) {
-  return tiersFromRows(rows).map((t) => tierHtml(t, dotMax)).join('');
+function laddersBodyHtml(rows, dotMax, appellations) {
+  return tiersFromRows(rows).map((t) => tierHtml(t, dotMax, appellations)).join('');
 }
 
 function subheadingHtml(text) {
@@ -92,7 +102,7 @@ function sectionHtml(label, count, bodyHtml, open) {
 function citySectionHtml(city) {
   const rows = city.rows || [];
   const body = subheadingHtml('Every character in the city, ranked. Always public.')
-    + (rows.length ? laddersBodyHtml(rows, 10) : emptyHtml('No standing recorded yet.'));
+    + (rows.length ? laddersBodyHtml(rows, 10, CITY_STATUS_APPELLATIONS) : emptyHtml('No standing recorded yet.'));
   return sectionHtml('City Status', rows.length, body, true);
 }
 
