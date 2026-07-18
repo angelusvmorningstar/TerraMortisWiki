@@ -59,6 +59,13 @@ import { isSuperViewer } from '../access.js';
 export const LOCATION_FIELDS = Object.freeze([
   'name', 'faction', 'type', 'layer', 'real_place', 'centroid', 'polygon', 'color', 'fill_alpha', 'stroke',
   'address', 'lat', 'lon', 'dots', 'resident_names',
+  // Point/line feature fields (ley lines, sites of power, NPC sites, seasonal courts, Sin-Eater
+  // sites, Wyrm's Nests) so the map can render each by the shared shape key rather than as a flat
+  // polygon. Still an allowlist: revealed_to is deliberately NOT here (filter-only), so the reveal
+  // list never reaches the client. A field absent on a given document is simply omitted.
+  'path', 'tier', 'rating', 'resonance', 'locus_type', 'anchor', 'territory', 'desc',
+  'category', 'tied_to', 'npc', 'suggested_address', 'confirmed',
+  'court', 'crown', 'emotion', 'note', 'nest_type', 'site_type', 'werewolf_faction', 'mage_order',
 ]);
 
 // Helper: true iff role is exactly 'st'. NOTE: this is no longer the map's
