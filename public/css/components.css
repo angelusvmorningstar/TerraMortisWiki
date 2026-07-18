@@ -741,10 +741,13 @@ a.office-seat:hover { border-color: var(--bdr3); }
    rather than --txt / --bg: the tiles are brightened to light in both themes,
    so the label must be dark-on-light in both, not flipped light in dark mode. */
 .terr-label {
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  padding: 0;
+  background: rgba(244, 236, 217, 0.55);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  border: 1px solid rgba(203, 184, 143, 0.6);
+  border-radius: 4px;
+  box-shadow: 0 1px 5px rgba(40, 30, 16, 0.28);
+  padding: 1px 7px;
   color: var(--map-label-ink);
   font-family: var(--fh);
   font-weight: 600;
@@ -752,9 +755,6 @@ a.office-seat:hover { border-color: var(--bdr3); }
   letter-spacing: 0.05em;
   white-space: nowrap;
   pointer-events: none;
-  text-shadow:
-    0 0 3px var(--map-label-halo), 0 0 3px var(--map-label-halo),
-    0 0 2px var(--map-label-halo), 0 0 2px var(--map-label-halo);
 }
 
 .terr-label::before {
