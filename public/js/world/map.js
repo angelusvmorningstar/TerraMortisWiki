@@ -13,6 +13,7 @@
 // this file itself never calls the API — the GeoJSON is static, public content.
 
 import { esc } from '../data/display.js';
+import { apiGet } from '../data/api.js';
 
 const PARCHMENT_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 
@@ -117,15 +118,15 @@ const REVEAL_SPLAT = {
 // (map key: circle = home, oxblood = personal vampire), and any ST-revealed territories as their
 // splat-coloured polygon. Fail-soft: any error just means no extra layer, rest of the map is fine.
 async function loadViewerLocations(map) {
+  // Use the shared authed helper (attaches the Discord Bearer token) — a bare fetch gets 401.
   let data;
   try {
-    const res = await fetch('/api/st-map/locations');
-    if (!res.ok) return;
-    data = await res.json();
+    data = await apiGet('/api/st-map/locations');
   } catch {
     return;
   }
-  const locs = Array.isArray(data && data.locations) ? data.locations : [];
+  if (!data || data._notFound) return;
+  const locs = Array.isArray(data.locations) ? data.locations : [];
   if (!locs.length) return;
   const group = L.layerGroup();
   locs.forEach((l) => {
