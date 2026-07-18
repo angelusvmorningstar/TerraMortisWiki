@@ -679,6 +679,14 @@ a.office-seat:hover { border-color: var(--bdr3); }
   border: 1px solid var(--bdr2);
   border-radius: 8px;
   overflow: hidden;
+  /* Map-label palette, pinned theme-independent and scoped to the map (the
+     cockpit's living-city-map does the same with its own --ink/--parchment).
+     The tile filter below brightens tiles to a light parchment tone in BOTH
+     light and dark themes, so labels must stay dark-ink-on-light-halo in both
+     — using the flipping --txt/--bg tokens made labels light-on-light (washed
+     out) in dark mode. These cascade to the Leaflet tooltips rendered inside. */
+  --map-label-ink: #2a2018;
+  --map-label-halo: #e9dcc0;
 }
 
 .world-map .world-map__tiles {
@@ -709,9 +717,9 @@ a.office-seat:hover { border-color: var(--bdr3); }
   border: 1px solid var(--bdr2);
 }
 
-.map-legend__swatch--territory { background: #7a2020; }
+.map-legend__swatch--territory { background: #a5342e; }
 .map-legend__swatch--exclusion { background: #2a2019; }
-.map-legend__swatch--elysium { background: #96742f; }
+.map-legend__swatch--elysium { background: #c8a13a; transform: rotate(45deg); }
 
 /* Leaflet's own popup chrome, retokenised so it doesn't look like an
    unstyled browser default dropped onto a themed page. */
@@ -728,13 +736,16 @@ a.office-seat:hover { border-color: var(--bdr3); }
 
 /* Territory name labels on the map — permanent tooltips, styled as plain
    text with a parchment-coloured halo so they read over any tile beneath,
-   mirroring the ST cockpit map's own terr-label treatment. */
+   mirroring the ST cockpit map's own terr-label treatment. Uses the pinned,
+   theme-independent --map-label-ink / --map-label-halo (scoped on .world-map)
+   rather than --txt / --bg: the tiles are brightened to light in both themes,
+   so the label must be dark-on-light in both, not flipped light in dark mode. */
 .terr-label {
   background: transparent;
   border: none;
   box-shadow: none;
   padding: 0;
-  color: var(--txt);
+  color: var(--map-label-ink);
   font-family: var(--fh);
   font-weight: 600;
   font-size: 0.8rem;
@@ -742,8 +753,8 @@ a.office-seat:hover { border-color: var(--bdr3); }
   white-space: nowrap;
   pointer-events: none;
   text-shadow:
-    0 0 3px var(--bg), 0 0 3px var(--bg),
-    0 0 2px var(--bg), 0 0 2px var(--bg);
+    0 0 3px var(--map-label-halo), 0 0 3px var(--map-label-halo),
+    0 0 2px var(--map-label-halo), 0 0 2px var(--map-label-halo);
 }
 
 .terr-label::before {
